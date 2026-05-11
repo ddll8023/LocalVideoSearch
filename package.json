@@ -4,10 +4,60 @@
   "private": true,
   "main": "electron/main/index.js",
   "scripts": {
-    "electron": "electron ."
+    "electron": "electron .",
+    "build:frontend": "npm --prefix frontend run build",
+    "dist:dir": "npm run build:frontend && electron-builder --win dir",
+    "dist:win": "npm run build:frontend && electron-builder --win"
   },
   "devDependencies": {
-    "electron": "^31.7.7"
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.videosearch.desktop",
+    "productName": "VideoSearch",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "package.json",
+      "electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "backend",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "frontend/dist",
+        "to": "frontend/dist",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "resources",
+        "to": "resources",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        "dir",
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "VideoSearch"
+    }
   }
 }
-
