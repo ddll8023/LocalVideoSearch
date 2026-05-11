@@ -5,15 +5,9 @@
       <span>返回搜索</span>
     </RouterLink>
 
-    <div v-if="videoStore.loading" class="surface rounded-lg px-5 py-12 text-center text-sm text-zinc-500">
-      <font-awesome-icon :icon="['fas', 'spinner']" class="fa-spin mr-2" aria-hidden="true" />
-      正在加载详情
-    </div>
+    <AppLoadingState v-if="videoStore.loading" text="正在加载详情" />
 
-    <div v-if="videoStore.error" class="surface rounded-lg border-red-200 bg-red-50 p-4 text-sm text-red-700">
-      <font-awesome-icon :icon="['fas', 'triangle-exclamation']" class="mr-2" aria-hidden="true" />
-      {{ videoStore.error }}
-    </div>
+    <AppAlert v-if="videoStore.error" :message="videoStore.error" />
 
     <section v-if="videoStore.currentVideo" class="surface grid gap-6 rounded-lg p-5 lg:grid-cols-[260px_1fr]">
       <div class="aspect-[3/4] overflow-hidden rounded-md bg-zinc-100">
@@ -51,9 +45,13 @@
         <h2 class="text-base font-semibold text-zinc-900">播放源</h2>
       </div>
 
-      <div v-if="videoStore.playSources.length === 0" class="rounded-md border border-dashed border-zinc-200 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-500">
-        暂无播放源
-      </div>
+      <AppEmptyState
+        v-if="videoStore.playSources.length === 0"
+        :framed="false"
+        :icon="['fas', 'play']"
+        title="暂无播放源"
+        description="该资源站没有返回可播放地址"
+      />
 
       <div v-for="source in videoStore.playSources" :key="source.format" class="mb-6 last:mb-0">
         <div class="mb-3 flex items-center justify-between gap-3">
@@ -86,6 +84,10 @@
 import { computed, onMounted, watch } from 'vue'
 
 import { useVideoStore } from '@/stores/video'
+
+import AppAlert from '@/components/base/AppAlert.vue'
+import AppEmptyState from '@/components/base/AppEmptyState.vue'
+import AppLoadingState from '@/components/base/AppLoadingState.vue'
 
 const props = defineProps({
   siteId: { type: String, required: true },

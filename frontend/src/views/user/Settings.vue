@@ -38,10 +38,7 @@
       </div>
     </section>
 
-    <div v-if="resourceStore.error" class="surface rounded-lg border-red-200 bg-red-50 p-4 text-sm text-red-700">
-      <font-awesome-icon :icon="['fas', 'triangle-exclamation']" class="mr-2" aria-hidden="true" />
-      {{ resourceStore.error }}
-    </div>
+    <AppAlert v-if="resourceStore.error" :message="resourceStore.error" />
 
     <section class="surface overflow-hidden rounded-lg">
       <header class="grid grid-cols-[1fr_auto] gap-3 border-b border-zinc-200 px-4 py-3 text-xs font-semibold uppercase text-zinc-500 md:grid-cols-[1fr_96px_180px_180px]">
@@ -51,14 +48,19 @@
         <span class="text-right">操作</span>
       </header>
 
-      <div v-if="resourceStore.loading && resourceStore.sites.length === 0" class="px-4 py-12 text-center text-sm text-zinc-500">
-        <font-awesome-icon :icon="['fas', 'spinner']" class="fa-spin mr-2" aria-hidden="true" />
-        正在加载资源站
-      </div>
+      <AppLoadingState
+        v-if="resourceStore.loading && resourceStore.sites.length === 0"
+        :framed="false"
+        text="正在加载资源站"
+      />
 
-      <div v-else-if="resourceStore.sites.length === 0" class="px-4 py-12 text-center text-sm text-zinc-500">
-        暂无资源站数据
-      </div>
+      <AppEmptyState
+        v-else-if="resourceStore.sites.length === 0"
+        :framed="false"
+        :icon="['fas', 'server']"
+        title="暂无资源站数据"
+        description="资源配置初始化后会显示可用站点"
+      />
 
       <article
         v-for="site in resourceStore.sites"
@@ -136,6 +138,10 @@ import { computed, onMounted } from 'vue'
 
 import { useResourceStore } from '@/stores/resources'
 import { formatDuration } from '@/utils/format'
+
+import AppAlert from '@/components/base/AppAlert.vue'
+import AppEmptyState from '@/components/base/AppEmptyState.vue'
+import AppLoadingState from '@/components/base/AppLoadingState.vue'
 
 const resourceStore = useResourceStore()
 

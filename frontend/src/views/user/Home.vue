@@ -22,10 +22,12 @@
       </form>
     </header>
 
-    <div v-if="searchStore.error" class="surface rounded-lg border-red-200 bg-red-50 p-4 text-sm text-red-700">
-      <font-awesome-icon :icon="['fas', 'triangle-exclamation']" class="mr-2" aria-hidden="true" />
-      {{ searchStore.error }}
-    </div>
+    <AppAlert v-if="searchStore.error" :message="searchStore.error" />
+
+    <AppLoadingState
+      v-if="searchStore.loading && searchStore.resultSites.length === 0"
+      text="正在并发搜索已启用资源站"
+    />
 
     <section v-if="searchStore.resultSites.length > 0" class="surface overflow-hidden rounded-lg">
       <header class="border-b border-zinc-200 px-4 py-3">
@@ -48,7 +50,7 @@
       <div v-if="activeResult" class="space-y-4 p-4">
         <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div class="text-sm text-zinc-500">
-            第 {{ activeResult.pagination.page }} / {{ displayTotalPages }} 页，
+            第 {{ activeResult.pagination.page }} / {{ totalPages }} 页，
             共 {{ activeResult.pagination.total }} 条
             <span v-if="activeResult.elapsedMs">，耗时 {{ formatDuration(activeResult.elapsedMs) }}</span>
           </div>
@@ -60,63 +62,28 @@
         </div>
 
         <div v-if="activeResult.lists.length > 0" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <RouterLink
+          <VideoResultCard
             v-for="video in activeResult.lists"
             :key="video.id"
-            class="group overflow-hidden rounded-md border border-zinc-200 bg-white transition hover:border-primary-500 hover:shadow-lift"
+            :video="video"
             :to="buildDetailLink(video)"
-          >
-            <div class="aspect-[3/4] bg-zinc-100">
-              <img
-                v-if="video.thumbnail"
-                class="h-full w-full object-cover"
-                :src="video.thumbnail"
-                :alt="video.title"
-                loading="lazy"
-              />
-              <div v-else class="flex h-full items-center justify-center text-zinc-300">
-                <font-awesome-icon :icon="['fas', 'film']" class="text-3xl" aria-hidden="true" />
-              </div>
-            </div>
-            <div class="space-y-2 p-3">
-              <h2 class="line-clamp-2 text-sm font-semibold text-zinc-900 group-hover:text-primary-700">
-                {{ video.title }}
-              </h2>
-              <p class="truncate text-xs text-zinc-500">
-                {{ video.year || '未知年份' }} · {{ video.type_name || '未分类' }}
-              </p>
-              <p class="truncate text-xs text-zinc-400">{{ video.status || video.actor || '暂无更多信息' }}</p>
-            </div>
-          </RouterLink>
+          />
         </div>
 
-        <div v-else class="rounded-md border border-dashed border-zinc-200 bg-zinc-50 px-4 py-10 text-center text-sm text-zinc-500">
-          当前资源站没有搜索结果
-        </div>
+        <AppEmptyState
+          v-else
+          :icon="['fas', 'film']"
+          :framed="false"
+          title="当前资源站没有搜索结果"
+          description="可以切换其他资源站或尝试下一页"
+        />
 
-        <footer class="flex flex-col gap-3 border-t border-zinc-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            class="toolbar-button"
-            type="button"
-            :disabled="!canPrevPage || searchStore.loading"
-            @click="changePage(activeResult.pagination.page - 1)"
-          >
-            <font-awesome-icon :icon="['fas', 'chevron-left']" aria-hidden="true" />
-            <span>上一页</span>
-          </button>
-          <span class="text-center text-sm text-zinc-500">
-            {{ activeResult.site.name }} · 每页 {{ activeResult.pagination.page_size }}
-          </span>
-          <button
-            class="toolbar-button"
-            type="button"
-            :disabled="!canNextPage || searchStore.loading"
-            @click="changePage(activeResult.pagination.page + 1)"
-          >
-            <span>下一页</span>
-            <font-awesome-icon :icon="['fas', 'chevron-right']" aria-hidden="true" />
-          </button>
-        </footer>
+        <AppPagination
+          :label="activeResult.site.name"
+          :loading="searchStore.loading"
+          :pagination="activeResult.pagination"
+          @page-change="changePage"
+        />
       </div>
     </section>
 
@@ -133,17 +100,12 @@
       </div>
     </section>
 
-    <section v-if="showEmptyState" class="surface rounded-lg p-8">
-      <div class="mx-auto flex max-w-xl flex-col items-center gap-4 text-center">
-        <div class="flex h-14 w-14 items-center justify-center rounded-md bg-primary-50 text-primary-700">
-          <font-awesome-icon :icon="['fas', 'magnifying-glass']" class="text-xl" aria-hidden="true" />
-        </div>
-        <div>
-          <h1 class="text-xl font-semibold text-zinc-900">{{ emptyTitle }}</h1>
-          <p class="mt-2 text-sm text-zinc-500">{{ emptyDescription }}</p>
-        </div>
-      </div>
-    </section>
+    <AppEmptyState
+      v-if="showEmptyState"
+      :icon="['fas', 'magnifying-glass']"
+      :title="emptyTitle"
+      :description="emptyDescription"
+    />
   </section>
 </template>
 
@@ -157,17 +119,17 @@ import { computed, onMounted, ref } from 'vue'
 import { useSearchStore } from '@/stores/search'
 import { formatDuration } from '@/utils/format'
 
+import AppAlert from '@/components/base/AppAlert.vue'
+import AppEmptyState from '@/components/base/AppEmptyState.vue'
+import AppLoadingState from '@/components/base/AppLoadingState.vue'
+import AppPagination from '@/components/base/AppPagination.vue'
+import VideoResultCard from '@/components/business/VideoResultCard.vue'
+
 const searchStore = useSearchStore()
 const draftKeyword = ref('')
 
 const activeResult = computed(() => searchStore.activeResult)
-const displayTotalPages = computed(() => activeResult.value?.pagination?.total_pages || 1)
-const canPrevPage = computed(() => Number(activeResult.value?.pagination?.page || 1) > 1)
-const canNextPage = computed(() => {
-  const pagination = activeResult.value?.pagination
-  if (!pagination) return false
-  return Number(pagination.page) < Number(pagination.total_pages || 0)
-})
+const totalPages = computed(() => Math.max(Number(activeResult.value?.pagination?.total_pages || 1), 1))
 const showEmptyState = computed(
   () => !searchStore.loading && (!searchStore.hasSearched || searchStore.resultSites.length === 0)
 )

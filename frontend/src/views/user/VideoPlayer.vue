@@ -24,10 +24,7 @@
             <span>详情</span>
           </RouterLink>
         </div>
-        <p v-if="videoStore.error" class="mt-3 text-sm text-red-700">
-          <font-awesome-icon :icon="['fas', 'triangle-exclamation']" class="mr-2" aria-hidden="true" />
-          {{ videoStore.error }}
-        </p>
+        <AppAlert v-if="videoStore.error" class="mt-3" :message="videoStore.error" />
       </div>
     </main>
 
@@ -37,14 +34,15 @@
         <span class="text-xs text-zinc-400">{{ videoStore.episodeList.length }} 集</span>
       </div>
 
-      <div v-if="videoStore.loading" class="py-8 text-center text-sm text-zinc-500">
-        <font-awesome-icon :icon="['fas', 'spinner']" class="fa-spin mr-2" aria-hidden="true" />
-        加载中
-      </div>
+      <AppLoadingState v-if="videoStore.loading" :framed="false" text="加载中" />
 
-      <div v-else-if="videoStore.episodeList.length === 0" class="rounded-md border border-dashed border-zinc-200 bg-zinc-50 px-3 py-8 text-center text-sm text-zinc-500">
-        暂无剧集数据
-      </div>
+      <AppEmptyState
+        v-else-if="videoStore.episodeList.length === 0"
+        :framed="false"
+        :icon="['fas', 'list']"
+        title="暂无剧集数据"
+        description="加载详情后会显示可切换剧集"
+      />
 
       <div v-else class="max-h-[calc(100vh-220px)] space-y-2 overflow-y-auto pr-1">
         <button
@@ -73,6 +71,10 @@ import { useRouter } from 'vue-router'
 import Hls from 'hls.js'
 
 import { useVideoStore } from '@/stores/video'
+
+import AppAlert from '@/components/base/AppAlert.vue'
+import AppEmptyState from '@/components/base/AppEmptyState.vue'
+import AppLoadingState from '@/components/base/AppLoadingState.vue'
 
 const props = defineProps({
   siteId: { type: String, required: true },
@@ -111,6 +113,10 @@ const attachSource = async (url) => {
   destroyHls()
   await nextTick()
   if (!url || !videoRef.value) return
+
+  videoRef.value.pause()
+  videoRef.value.removeAttribute('src')
+  videoRef.value.load()
 
   if (url.includes('.m3u8') && Hls.isSupported()) {
     hlsInstance.value = new Hls()
@@ -159,8 +165,7 @@ watch(
   (url) => {
     videoStore.selectEpisodeByUrl(url)
     attachSource(url)
-  },
-  { immediate: true }
+  }
 )
 
 onMounted(() => {
