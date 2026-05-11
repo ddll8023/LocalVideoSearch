@@ -1,0 +1,13 @@
+{
+  "name": "videosearch-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "electron/main/index.js",
+  "scripts": {
+    "electron": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.7.7"
+  }
+}
+

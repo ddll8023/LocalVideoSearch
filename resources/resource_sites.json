@@ -1,0 +1,165 @@
+{
+  "sites": [
+    {
+      "site_id": "lzm3u8",
+      "name": "量子资源",
+      "base_url": "https://cj.lziapi.com/api.php/provide/vod/from/lzm3u8/at/json",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "ffm3u8",
+      "name": "非凡资源",
+      "base_url": "http://api.ffzyapi.com/api.php/provide/vod/from/ffm3u8/at/json",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "rym3u8",
+      "name": "如意资源",
+      "base_url": "http://cj.rycjapi.com/api.php/provide/vod/from/rym3u8/at/json/",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "bfm3u8",
+      "name": "暴风资源",
+      "base_url": "https://bfzyapi.com/api.php/provide/vod/at/json",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "tpm3u8",
+      "name": "淘片资源",
+      "base_url": "https://taopianapi.com/cjapi/sda/vod/json/m3u8.html",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "mtm3u8",
+      "name": "茅台资源",
+      "base_url": "https://caiji.maotaizy.cc/api.php/provide/vod/from/mtm3u8/at/josn/",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "wjm3u8",
+      "name": "无尽资源",
+      "base_url": "https://api.wujinapi.me/api.php/provide/vod/from/wjm3u8/json",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "ukm3u8",
+      "name": "u酷资源",
+      "base_url": "https://api.ukuapi88.com/api.php/provide/vod/from/ukm3u8/at/json/",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "hnm3u8",
+      "name": "红牛资源",
+      "base_url": "https://www.hongniuzy2.com/api.php/provide/vod/from/hnm3u8/",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "dbm3u8",
+      "name": "豆瓣资源",
+      "base_url": "https://caiji.dbzy5.com/api.php/provide/vod/from/dbm3u8/at/josn/",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "jsm3u8",
+      "name": "极速资源",
+      "base_url": "https://caiji.dbzy5.com/api.php/provide/vod/from/dbm3u8/at/josn/",
+      "enabled": false,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "snm3u8",
+      "name": "索尼资源",
+      "base_url": "https://suoniapi.com/api.php/provide/vod",
+      "enabled": false,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "okm3u8",
+      "name": "ok资源",
+      "base_url": "https://api.okzyw.net/api.php/provide/vod",
+      "enabled": false,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "gsm3u8",
+      "name": "光速资源",
+      "base_url": "https://api.guangsuapi.com/api.php/provide/vod/from/gsm3u8/",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "jym3u8",
+      "name": "金鹰资源",
+      "base_url": "https://jyzyapi.com/provide/vod/from/jinyingm3u8/at/json",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    },
+    {
+      "site_id": "xlm3u8",
+      "name": "新浪资源",
+      "base_url": "https://api.xinlangapi.com/xinlangapi.php/provide/vod/from/xlm3u8/",
+      "enabled": true,
+      "timeout": 15,
+      "search_endpoint": "wd",
+      "page_param": "pg",
+      "action_param": "ac"
+    }
+  ]
+}
+
