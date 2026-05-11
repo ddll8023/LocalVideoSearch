@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "0.1.0"
     APP_ENV: str = "development"
     API_HOST: str = "127.0.0.1"
-    API_PORT: int = 8765
+    API_PORT: int = 4740
     APP_DATA_DIR: Path = Path.home() / "AppData" / "Roaming" / "VideoSearch"
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
