@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 import { searchVideos } from '@/api/videos'
@@ -98,40 +98,61 @@ export const useSearchStore = defineStore('search', () => {
         return
       }
 
-      const responses = await Promise.allSettled(
-        resourceStore.enabledSites.map((site) =>
-          searchVideos({
-            wd,
-            siteId: site.site_id,
-            page,
-            pageSize
-          }).then((response) => ({
-            site,
-            payload: response.data
-          }))
-        )
-      )
+      const sites = resourceStore.enabledSites
 
-      const nextResultMap = {}
-      const nextFailureMap = {}
-      responses.forEach((response, index) => {
-        if (response.status === 'fulfilled') {
-          const { site, payload } = response.value
-          nextResultMap[site.site_id] = buildSiteResult(site, payload, page, pageSize)
-          return
+      const queue = []
+      let wakeResolve = null
+      const wake = () => {
+        if (wakeResolve) {
+          wakeResolve()
+          wakeResolve = null
         }
+      }
+      const waitWake = () => new Promise((r) => { wakeResolve = r })
+      const push = (item) => { queue.push(item); wake() }
 
-        const site = resourceStore.enabledSites[index]
-        if (!site) return
-        nextFailureMap[site.site_id] = {
-          site,
-          message: response.reason?.message || '搜索失败'
-        }
+      let settled = 0
+      const total = sites.length
+
+      sites.forEach((site) => {
+        searchVideos({ wd, siteId: site.site_id, page, pageSize })
+          .then((response) => {
+            push({ ok: true, site, data: response.data })
+          })
+          .catch((err) => {
+            push({ ok: false, site, message: err?.message || '搜索失败' })
+          })
+          .finally(() => {
+            settled++
+            if (settled === total) push(null)
+          })
       })
 
-      resultMap.value = nextResultMap
-      failureMap.value = nextFailureMap
-      activeSiteId.value = Object.keys(nextResultMap)[0] || ''
+      while (true) {
+        if (queue.length === 0) await waitWake()
+        const item = queue.shift()
+        if (item === null) break
+
+        if (item.ok) {
+          resultMap.value = {
+            ...resultMap.value,
+            [item.site.site_id]: buildSiteResult(item.site, item.data, page, pageSize)
+          }
+          if (!activeSiteId.value) {
+            activeSiteId.value = item.site.site_id
+          }
+        } else {
+          failureMap.value = {
+            ...failureMap.value,
+            [item.site.site_id]: { site: item.site, message: item.message }
+          }
+        }
+        await nextTick()
+      }
+
+      if (!activeSiteId.value) {
+        activeSiteId.value = Object.keys(resultMap.value)[0] || ''
+      }
       saveCache()
     } catch (searchError) {
       error.value = searchError.message

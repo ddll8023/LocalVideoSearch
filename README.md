@@ -1,4 +1,4 @@
-# VideoSearch
+# VideoSearch v0.1.0
 
 VideoSearch 是一个本机运行的桌面端视频搜索工具，使用 `Vue 3 + Electron + FastAPI` 构建。
 

@@ -1,9 +1,9 @@
 <template>
   <RouterLink
-    class="group overflow-hidden rounded-md border border-zinc-200 bg-white transition hover:border-primary-500 hover:shadow-lift"
+    class="group overflow-hidden rounded-md border border-zinc-200 bg-white transition duration-200 hover:border-primary-500 hover:shadow-lift hover:-translate-y-0.5"
     :to="to"
   >
-    <div class="aspect-[3/4] bg-zinc-100">
+    <div class="aspect-[4/5] bg-zinc-100">
       <img
         v-if="video.thumbnail"
         class="h-full w-full object-cover"
@@ -15,8 +15,8 @@
         <font-awesome-icon :icon="['fas', 'film']" class="text-3xl" aria-hidden="true" />
       </div>
     </div>
-    <div class="space-y-2 p-3">
-      <h2 class="line-clamp-2 min-h-10 text-sm font-semibold text-zinc-900 group-hover:text-primary-700">
+    <div class="space-y-1 p-2">
+      <h2 class="line-clamp-2 text-sm font-semibold text-zinc-900 group-hover:text-primary-700">
         {{ video.title || '未命名视频' }}
       </h2>
       <p class="truncate text-xs text-zinc-500">

@@ -16,13 +16,17 @@ import {
   faLayerGroup,
   faList,
   faMagnifyingGlass,
+  faMinus,
   faPlay,
   faRotate,
   faServer,
   faSpinner,
+  faSquare,
   faTriangleExclamation,
   faTv,
-  faVideo
+  faVideo,
+  faWindowRestore,
+  faXmark
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 import { createPinia } from 'pinia'
@@ -49,13 +53,17 @@ library.add(
   faLayerGroup,
   faList,
   faMagnifyingGlass,
+  faMinus,
   faPlay,
   faRotate,
   faServer,
   faSpinner,
+  faSquare,
   faTriangleExclamation,
   faTv,
-  faVideo
+  faVideo,
+  faWindowRestore,
+  faXmark
 )
 
 const app = createApp(App)

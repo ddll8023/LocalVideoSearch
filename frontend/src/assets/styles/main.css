@@ -46,5 +46,65 @@
   .field-input {
     @apply h-11 w-full rounded-md border border-zinc-300 bg-white px-4 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-100;
   }
+
+  .window-btn {
+    -webkit-app-region: no-drag;
+    @apply inline-flex h-8 w-8 items-center justify-center rounded-sm text-xs text-zinc-500 transition-colors hover:bg-zinc-200/80;
+  }
+
+  .window-btn-close:hover {
+    @apply bg-red-500 text-white;
+  }
+
+  .site-btn {
+    @apply flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition;
+  }
+
+  .site-btn-active {
+    @apply bg-primary-50 font-medium text-primary-700;
+  }
+
+  .site-btn-inactive {
+    @apply text-zinc-600 hover:bg-zinc-50;
+  }
+
+  .page-btn {
+    @apply inline-flex h-8 min-w-[32px] items-center justify-center rounded-md border border-zinc-200 bg-white px-2 text-xs font-medium text-zinc-700 transition hover:border-primary-500 hover:text-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .page-btn-active {
+    @apply border-primary-500 bg-primary-50 font-semibold text-primary-700;
+  }
+
+  .jump-input {
+    @apply h-7 w-14 rounded border border-zinc-200 bg-white px-2 text-center text-xs text-zinc-700 outline-none transition focus:border-primary-500 focus:ring-1 focus:ring-primary-100;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(31, 41, 51, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(31, 41, 51, 0.3);
+}
+
+.overflow-x-auto::-webkit-scrollbar {
+  height: 4px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: rgba(31, 41, 51, 0.1);
+  border-radius: 2px;
 }
 

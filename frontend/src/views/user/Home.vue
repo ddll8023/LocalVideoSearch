@@ -30,60 +30,65 @@
     />
 
     <section v-if="searchStore.resultSites.length > 0" class="surface overflow-hidden rounded-lg">
-      <header class="border-b border-zinc-200 px-4 py-3">
-        <div class="flex gap-2 overflow-x-auto">
+      <div class="flex">
+        <aside class="w-44 shrink-0 border-r border-zinc-200 overflow-y-auto p-3 space-y-1">
           <button
             v-for="result in searchStore.resultSites"
             :key="result.site.site_id"
-            class="toolbar-button h-9 shrink-0"
-            :class="searchStore.activeSiteId === result.site.site_id ? 'border-primary-600 text-primary-700' : ''"
             type="button"
+            class="site-btn"
+            :class="searchStore.activeSiteId === result.site.site_id ? 'site-btn-active' : 'site-btn-inactive'"
             @click="searchStore.setActiveSite(result.site.site_id)"
           >
-            <font-awesome-icon :icon="['fas', 'server']" aria-hidden="true" />
-            <span>{{ result.site.name }}</span>
-            <span class="text-xs text-zinc-400">{{ result.pagination.total }}</span>
+            <span class="truncate">{{ result.site.name }}</span>
+            <span class="ml-2 shrink-0 text-xs opacity-60">{{ result.pagination.total }}</span>
           </button>
+        </aside>
+
+        <div class="min-w-0 flex-1">
+          <transition name="tab-fade" mode="out-in">
+            <div v-if="activeResult" :key="searchStore.activeSiteId" class="space-y-4 p-4">
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div class="text-sm text-zinc-500">
+                  第 {{ activeResult.pagination.page }} / {{ totalPages }} 页，
+                  共 {{ activeResult.pagination.total }} 条
+                  <span v-if="activeResult.elapsedMs">，耗时 {{ formatDuration(activeResult.elapsedMs) }}</span>
+                </div>
+                <div v-if="activeResult.filterStats" class="text-xs text-zinc-500">
+                  原始 {{ activeResult.filterStats.original_count }}，
+                  过滤 {{ activeResult.filterStats.filtered_count }}，
+                  展示 {{ activeResult.filterStats.display_count }}
+                </div>
+              </div>
+
+              <div v-if="activeResult.lists.length > 0" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <VideoResultCard
+                  v-for="(video, index) in activeResult.lists"
+                  :key="video.id"
+                  :video="video"
+                  :to="buildDetailLink(video)"
+                  class="animate-fade-up"
+                  :style="{ animationDelay: `${Math.min(index * 40, 400)}ms` }"
+                />
+              </div>
+
+              <AppEmptyState
+                v-else
+                :icon="['fas', 'film']"
+                :framed="false"
+                title="当前资源站没有搜索结果"
+                description="可以切换其他资源站或尝试下一页"
+              />
+
+              <AppPagination
+                :label="activeResult.site.name"
+                :loading="searchStore.loading"
+                :pagination="activeResult.pagination"
+                @page-change="changePage"
+              />
+            </div>
+          </transition>
         </div>
-      </header>
-
-      <div v-if="activeResult" class="space-y-4 p-4">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div class="text-sm text-zinc-500">
-            第 {{ activeResult.pagination.page }} / {{ totalPages }} 页，
-            共 {{ activeResult.pagination.total }} 条
-            <span v-if="activeResult.elapsedMs">，耗时 {{ formatDuration(activeResult.elapsedMs) }}</span>
-          </div>
-          <div v-if="activeResult.filterStats" class="text-xs text-zinc-500">
-            原始 {{ activeResult.filterStats.original_count }}，
-            过滤 {{ activeResult.filterStats.filtered_count }}，
-            展示 {{ activeResult.filterStats.display_count }}
-          </div>
-        </div>
-
-        <div v-if="activeResult.lists.length > 0" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <VideoResultCard
-            v-for="video in activeResult.lists"
-            :key="video.id"
-            :video="video"
-            :to="buildDetailLink(video)"
-          />
-        </div>
-
-        <AppEmptyState
-          v-else
-          :icon="['fas', 'film']"
-          :framed="false"
-          title="当前资源站没有搜索结果"
-          description="可以切换其他资源站或尝试下一页"
-        />
-
-        <AppPagination
-          :label="activeResult.site.name"
-          :loading="searchStore.loading"
-          :pagination="activeResult.pagination"
-          @page-change="changePage"
-        />
       </div>
     </section>
 
@@ -177,3 +182,15 @@ const buildDetailLink = (video) => ({
   }
 })
 </script>
+
+<style scoped>
+.tab-fade-enter-active,
+.tab-fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.tab-fade-enter-from,
+.tab-fade-leave-to {
+  opacity: 0;
+}
+</style>

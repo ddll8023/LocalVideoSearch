@@ -4,6 +4,8 @@ const fs = require('node:fs')
 const http = require('node:http')
 const path = require('node:path')
 
+let mainWindow = null
+
 const BACKEND_HOST = '127.0.0.1'
 const BACKEND_PORT = 4740
 const PROJECT_ROOT = path.resolve(__dirname, '../..')
@@ -226,11 +228,12 @@ function stopBackend() {
 }
 
 function createWindow() {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
     minWidth: 1024,
     minHeight: 680,
+    frame: false,
     backgroundColor: '#f7f7f2',
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.js'),
@@ -238,6 +241,13 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false
     }
+  })
+
+  mainWindow.on('maximize', () => {
+    mainWindow.webContents.send('window:maximized-changed', true)
+  })
+  mainWindow.on('unmaximize', () => {
+    mainWindow.webContents.send('window:maximized-changed', false)
   })
 
   const rendererUrl = getRendererUrl()
@@ -258,6 +268,24 @@ ipcMain.handle('app:get-info', () => ({
 ipcMain.handle('backend:get-base-url', () => backendState.baseUrl)
 
 ipcMain.handle('backend:get-status', () => backendState)
+
+ipcMain.handle('window:minimize', () => {
+  if (mainWindow) mainWindow.minimize()
+})
+
+ipcMain.handle('window:maximize', () => {
+  if (mainWindow) {
+    mainWindow.isMaximized() ? mainWindow.unmaximize() : mainWindow.maximize()
+  }
+})
+
+ipcMain.handle('window:close', () => {
+  if (mainWindow) mainWindow.close()
+})
+
+ipcMain.handle('window:is-maximized', () => {
+  return mainWindow ? mainWindow.isMaximized() : false
+})
 
 app.whenReady().then(async () => {
   try {

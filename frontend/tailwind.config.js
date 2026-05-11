@@ -26,6 +26,20 @@ export default {
       boxShadow: {
         line: '0 1px 0 rgba(31, 41, 51, 0.08)',
         lift: '0 20px 45px rgba(31, 41, 51, 0.08)'
+      },
+      keyframes: {
+        'fade-up': {
+          '0%': { opacity: '0', transform: 'translateY(12px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' }
+        },
+        'fade-in': {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' }
+        }
+      },
+      animation: {
+        'fade-up': 'fade-up 0.4s ease-out both',
+        'fade-in': 'fade-in 0.3s ease-out both'
       }
     }
   },
