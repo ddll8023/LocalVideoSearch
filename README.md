@@ -12,7 +12,7 @@ VideoSearch 是一个本机运行的桌面端视频搜索工具，使用 `Vue 3 
 | 前端        | Vue 3、Pinia、Vue Router、Axios、Tailwind CSS、FontAwesome、HLS.js、ECharts |
 | 后端        | FastAPI、Pydantic Settings、HTTPX、Uvicorn                                  |
 | Python 环境 | uv、`backend/.venv/`                                                      |
-| 打包        | electron-builder、免安装目录版、NSIS                                        |
+| 打包        | electron-builder、PyInstaller、免安装目录版、NSIS                              |
 
 ## 功能模块
 
@@ -29,6 +29,7 @@ VideoSearch 是一个本机运行的桌面端视频搜索工具，使用 `Vue 3 
 VideoSearch/
 ├── backend/                 # FastAPI 后端
 │   ├── app/
+│   ├── entry.py             # PyInstaller 打包入口
 │   ├── pyproject.toml
 │   └── .venv/               # uv 管理的 Python 虚拟环境
 ├── electron/                # Electron 主进程和 preload
@@ -142,13 +143,11 @@ cd D:\demo\electron\VideoSearch
 npm run dist:dir
 ```
 
-打包脚本会先执行前端构建：
+打包脚本执行流程：
 
-```text
-npm --prefix frontend run build
-```
-
-然后通过 `electron-builder --win dir` 生成免安装目录版。
+1. 前端构建：`npm --prefix frontend run build`
+2. 后端打包：`uv run --directory backend pyinstaller --onefile --name backend backend/entry.py`
+3. Electron 打包：`electron-builder --win dir` 生成免安装目录版
 
 构建产物输出目录：
 
@@ -175,13 +174,13 @@ npm run dist:win
 
 ## 打包资源说明
 
-当前 `electron-builder` 配置会将以下目录复制到安装包资源目录：
+当前 `electron-builder` 配置会将以下内容复制到安装包资源目录：
 
-| 源路径            | 打包后路径                              |
-| ----------------- | --------------------------------------- |
-| `backend`       | `process.resourcesPath/backend`       |
-| `frontend/dist` | `process.resourcesPath/frontend/dist` |
-| `resources`     | `process.resourcesPath/resources`     |
+| 源路径                  | 打包后路径                                    |
+| ----------------------- | --------------------------------------------- |
+| `backend/dist/backend.exe` | `process.resourcesPath/backend/backend.exe` |
+| `frontend/dist`         | `process.resourcesPath/frontend/dist`         |
+| `resources`             | `process.resourcesPath/resources`             |
 
 打包后 Electron 会从以下位置加载前端页面：
 
@@ -189,10 +188,10 @@ npm run dist:win
 process.resourcesPath/frontend/dist/index.html
 ```
 
-并从以下位置启动后端：
+并从以下位置启动后端（PyInstaller 单文件 exe，无需 Python 环境）：
 
 ```text
-process.resourcesPath/backend/.venv/Scripts/python.exe
+process.resourcesPath/backend/backend.exe
 ```
 
 ## 应用数据目录
@@ -216,12 +215,12 @@ resources/resource_sites.json
 
 ## 常见问题
 
-### 后端启动失败：Python executable not found
+### 后端启动失败：Backend executable not found
 
-说明 `backend/.venv/Scripts/python.exe` 不存在。需要在项目根目录执行：
+说明 `backend/dist/backend.exe` 不存在。需要先执行后端打包：
 
 ```powershell
-uv sync --directory backend
+npm run build:backend
 ```
 
 ### 打包后页面空白或静态资源加载失败

@@ -21,3 +21,11 @@ logs/
 
 # Release
 release/
+
+# PyInstaller
+backend/build/
+backend/dist/
+backend/*.spec
+
+build
+*.spec

@@ -29,7 +29,10 @@ function getBackendRoot() {
     : path.join(PROJECT_ROOT, 'backend')
 }
 
-function getPythonExecutablePath() {
+function getBackendExecutablePath() {
+  if (app.isPackaged) {
+    return path.join(getBackendRoot(), 'backend.exe')
+  }
   return path.join(getBackendRoot(), '.venv', 'Scripts', 'python.exe')
 }
 
@@ -98,13 +101,13 @@ async function startBackend() {
   }
 
   const backendRoot = getBackendRoot()
-  const pythonPath = getPythonExecutablePath()
+  const backendExePath = getBackendExecutablePath()
   const appDataDir = path.join(app.getPath('appData'), 'VideoSearch')
   const logsDir = path.join(appDataDir, 'logs')
   const port = BACKEND_PORT
   const baseUrl = `http://${BACKEND_HOST}:${port}`
 
-  if (!fs.existsSync(pythonPath)) {
+  if (!fs.existsSync(backendExePath)) {
     backendState = {
       running: false,
       status: 'error',
@@ -113,7 +116,7 @@ async function startBackend() {
       port,
       pid: null,
       appDataDir,
-      error: `Python executable not found: ${pythonPath}`
+      error: `Backend executable not found: ${backendExePath}`
     }
     return backendState
   }
@@ -131,11 +134,15 @@ async function startBackend() {
     error: ''
   }
 
+  const spawnArgs = app.isPackaged
+    ? []
+    : ['-m', 'uvicorn', 'app.main:app', '--host', BACKEND_HOST, '--port', String(port)]
+
   backendProcess = spawn(
-    pythonPath,
-    ['-m', 'uvicorn', 'app.main:app', '--host', BACKEND_HOST, '--port', String(port)],
+    backendExePath,
+    spawnArgs,
     {
-      cwd: backendRoot,
+      cwd: app.isPackaged ? undefined : backendRoot,
       env: {
         ...process.env,
         API_HOST: BACKEND_HOST,

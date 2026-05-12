@@ -6,8 +6,9 @@
   "scripts": {
     "electron": "electron .",
     "build:frontend": "npm --prefix frontend run build",
-    "dist:dir": "npm run build:frontend && electron-builder --win dir",
-    "dist:win": "npm run build:frontend && electron-builder --win"
+    "build:backend": "uv run --directory backend pyinstaller --onefile --name backend --distpath backend/dist backend/entry.py",
+    "dist:dir": "npm run build:frontend && npm run build:backend && electron-builder --win dir",
+    "dist:win": "npm run build:frontend && npm run build:backend && electron-builder --win"
   },
   "devDependencies": {
     "electron": "^31.7.7",
@@ -25,11 +26,8 @@
     ],
     "extraResources": [
       {
-        "from": "backend",
-        "to": "backend",
-        "filter": [
-          "**/*"
-        ]
+        "from": "backend/dist/backend.exe",
+        "to": "backend/backend.exe"
       },
       {
         "from": "frontend/dist",

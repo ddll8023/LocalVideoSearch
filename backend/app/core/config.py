@@ -1,10 +1,13 @@
 """应用配置入口"""
+import sys
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+if getattr(sys, "frozen", False):
+    PROJECT_ROOT = Path(sys.executable).resolve().parent.parent
+else:
+    PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
