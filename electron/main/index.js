@@ -33,7 +33,11 @@ function getBackendExecutablePath() {
   if (app.isPackaged) {
     return path.join(getBackendRoot(), 'backend.exe')
   }
-  return path.join(getBackendRoot(), '.venv', 'Scripts', 'python.exe')
+  const isWindows = process.platform === 'win32'
+  const venvPython = isWindows
+    ? path.join('Scripts', 'python.exe')
+    : path.join('bin', 'python')
+  return path.join(getBackendRoot(), '.venv', venvPython)
 }
 
 function getRendererUrl() {
