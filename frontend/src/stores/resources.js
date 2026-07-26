@@ -1,7 +1,15 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
-import { getResourceSites, testResourceSite, toggleResourceSite } from '@/api/resources'
+import {
+  createResourceSite,
+  deleteResourceSite,
+  getResourceSites,
+  testAllResourceSites,
+  testResourceSite,
+  toggleResourceSite,
+  updateResourceSite
+} from '@/api/resources'
 
 export const useResourceStore = defineStore('resources', () => {
   const sites = ref([])
@@ -79,15 +87,64 @@ export const useResourceStore = defineStore('resources', () => {
   }
 
   const testEnabledSites = async () => {
-    const results = []
-    for (const site of enabledSites.value) {
-      try {
-        results.push(await testSite(site.site_id))
-      } catch {
-        // 单站点失败已写入 testResultMap，继续测试其余站点。
-      }
+    const enabledIds = enabledSites.value.map((site) => site.site_id)
+    const testingPatch = Object.fromEntries(enabledIds.map((siteId) => [siteId, true]))
+    testingMap.value = { ...testingMap.value, ...testingPatch }
+    error.value = ''
+    try {
+      const response = await testAllResourceSites()
+      const results = response.data?.results || []
+      const resultPatch = Object.fromEntries(
+        results.map((result) => [result.site_id, result])
+      )
+      testResultMap.value = { ...testResultMap.value, ...resultPatch }
+      return response.data
+    } catch (testAllError) {
+      error.value = testAllError.message
+      throw testAllError
+    } finally {
+      const donePatch = Object.fromEntries(enabledIds.map((siteId) => [siteId, false]))
+      testingMap.value = { ...testingMap.value, ...donePatch }
     }
-    return results
+  }
+
+  const createSite = async (siteData) => {
+    error.value = ''
+    try {
+      const response = await createResourceSite(siteData)
+      await fetchSites()
+      return response.data
+    } catch (createError) {
+      error.value = createError.message
+      throw createError
+    }
+  }
+
+  const updateSite = async (siteId, siteData) => {
+    error.value = ''
+    try {
+      const response = await updateResourceSite(siteId, siteData)
+      await fetchSites()
+      return response.data
+    } catch (updateError) {
+      error.value = updateError.message
+      throw updateError
+    }
+  }
+
+  const deleteSite = async (siteId) => {
+    error.value = ''
+    try {
+      const response = await deleteResourceSite(siteId)
+      const restResults = { ...testResultMap.value }
+      delete restResults[siteId]
+      testResultMap.value = restResults
+      await fetchSites()
+      return response.data
+    } catch (deleteError) {
+      error.value = deleteError.message
+      throw deleteError
+    }
   }
 
   return {
@@ -103,6 +160,9 @@ export const useResourceStore = defineStore('resources', () => {
     fetchSites,
     toggleSite,
     testSite,
-    testEnabledSites
+    testEnabledSites,
+    createSite,
+    updateSite,
+    deleteSite
   }
 })

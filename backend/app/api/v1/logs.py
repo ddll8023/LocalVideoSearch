@@ -1,5 +1,5 @@
 """日志 API"""
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 
 from app.schemas import logs as schemas_logs
 from app.schemas.response import ApiResponse, PaginatedResponse, error, success
@@ -32,6 +32,21 @@ def query_log_stats():
     try:
         result = services_logs.get_log_stats()
         return success(data=result)
+    except ServiceException as exc:
+        return error(code=exc.code, message=exc.message)
+
+
+@router.get("/export")
+def export_system_logs(query: schemas_logs.LogExportRequest = Depends()):
+    """导出系统日志"""
+    try:
+        filename, content, media_type = services_logs.export_logs(query)
+        # 文件下载端点：直接返回附件响应，不包 ApiResponse 壳
+        return Response(
+            content=content,
+            media_type=media_type,
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
     except ServiceException as exc:
         return error(code=exc.code, message=exc.message)
 

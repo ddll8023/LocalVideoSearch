@@ -20,6 +20,17 @@ class LogListRequest(BaseModel):
     keyword: str | None = Field(None, description="关键词")
 
 
+class LogExportRequest(BaseModel):
+    """日志导出请求"""
+
+    log_type: str | None = Field(None, description="日志类型")
+    level: str | None = Field(None, description="日志级别")
+    start_time: str | None = Field(None, description="开始时间")
+    end_time: str | None = Field(None, description="结束时间")
+    keyword: str | None = Field(None, description="关键词")
+    export_format: str = Field("json", description="导出格式（json/csv）")
+
+
 class ClearLogsRequest(BaseModel):
     """清理日志请求"""
 

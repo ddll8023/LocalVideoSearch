@@ -1,4 +1,6 @@
 """视频字段映射工具"""
+import html
+import re
 from typing import Any
 
 
@@ -24,9 +26,9 @@ def safe_get_int(data: dict[str, Any], key: str, default: int = 0) -> int:
 
 
 def parse_play_sources(play_url_str: str, play_from_str: str = ""):
-    """解析播放源字符串"""
+    """解析播放源字符串，按线路聚合"""
     if not play_url_str or not isinstance(play_url_str, str):
-        return {}
+        return []
 
     play_from_list = play_from_str.split("$$$") if play_from_str else [""]
     play_url_list = play_url_str.split("$$$")
@@ -34,7 +36,7 @@ def parse_play_sources(play_url_str: str, play_from_str: str = ""):
     while len(play_from_list) < len(play_url_list):
         play_from_list.append(f"source_{len(play_from_list) + 1}")
 
-    play_sources = {}
+    play_sources = []
     for play_from, play_url in zip(play_from_list, play_url_list, strict=False):
         play_from = play_from.strip()
         play_url = play_url.strip()
@@ -56,8 +58,13 @@ def parse_play_sources(play_url_str: str, play_from_str: str = ""):
         if not episodes:
             continue
 
-        format_type = _identify_play_format(play_from, episodes[0]["url"])
-        play_sources.setdefault(format_type, []).extend(episodes)
+        play_sources.append(
+            {
+                "name": play_from or f"线路{len(play_sources) + 1}",
+                "format": _identify_play_format(play_from, episodes[0]["url"]),
+                "episodes": episodes,
+            }
+        )
 
     return play_sources
 
@@ -116,12 +123,16 @@ def map_video_item(site_id: str, site_name: str, item: dict[str, Any]):
         "platform": site_name or site_id,
         "id": safe_get(item, "vod_id"),
         "title": safe_get(item, "vod_name"),
-        "description": safe_get(item, "vod_content"),
+        "description": _strip_html(safe_get(item, "vod_content")),
         "thumbnail": safe_get(item, "vod_pic"),
         "view_count": view_count,
         "upload_date": safe_get(item, "vod_pubdate"),
         "channel": safe_get(item, "vod_class"),
         "actor": safe_get(item, "vod_actor"),
+        "director": safe_get(item, "vod_director"),
+        "score": safe_get(item, "vod_score"),
+        "total_episodes": safe_get(item, "vod_total"),
+        "update_time": safe_get(item, "vod_time"),
         "area": safe_get(item, "vod_area"),
         "language": safe_get(item, "vod_lang"),
         "year": safe_get(item, "vod_year"),
@@ -135,6 +146,14 @@ def map_video_item(site_id: str, site_name: str, item: dict[str, Any]):
 
 
 """辅助函数"""
+
+
+def _strip_html(text: str) -> str:
+    """清除 HTML 标签并反转义实体"""
+    if not text:
+        return ""
+    cleaned = re.sub(r"<[^>]+>", "", text)
+    return html.unescape(cleaned).strip()
 
 
 def _identify_play_format(play_from: str, sample_url: str) -> str:

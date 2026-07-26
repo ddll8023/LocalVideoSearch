@@ -1,20 +1,27 @@
 """监控聚合服务"""
 from datetime import datetime, timedelta
+import time
 from urllib.parse import parse_qs, urlparse
 
 from app.schemas import monitor as schemas_monitor
 from app.services import logs as services_logs
 
 
+# 监控日志读取缓存的 TTL（秒）
+MONITOR_CACHE_TTL_SECONDS = 30
+
+# 进程内缓存：{hours_back: (缓存时间戳, 日志条目列表)}
+_entries_cache: dict[int, tuple[float, list[dict]]] = {}
+
+
 def get_dashboard_overview():
     """获取仪表板概览"""
-    entries = services_logs.read_log_entries(hours_back=24)
+    entries = _get_entries_cached(24)
     requests = _get_completed_requests(entries)
     success_count = len([entry for entry in requests if _is_success_request(entry)])
     error_count = len([entry for entry in entries if entry.get("level") == "ERROR"])
 
     return schemas_monitor.DashboardOverviewResponse(
-        active_users=1 if entries else 0,
         search_count=len(requests),
         success_rate=_build_rate(success_count, len(requests)),
         average_response_time=_average_response_time(requests),
@@ -23,27 +30,9 @@ def get_dashboard_overview():
     )
 
 
-def get_active_users_stats(minutes: int):
-    """获取活跃用户统计"""
-    entries = services_logs.read_log_entries(hours_back=max(1, _minutes_to_hours(minutes)))
-    min_timestamp = int((datetime.now() - timedelta(minutes=minutes)).timestamp() * 1000)
-    recent_entries = [
-        entry for entry in entries if int(entry.get("timestamp") or 0) >= min_timestamp
-    ]
-
-    return schemas_monitor.ActiveUsersResponse(
-        minutes=minutes,
-        active_users=1 if recent_entries else 0,
-        request_count=len(_get_completed_requests(recent_entries)),
-        operation_count=len(
-            [entry for entry in recent_entries if entry.get("log_type") == "operation"]
-        ),
-    )
-
-
 def get_search_stats(hours: int):
     """获取搜索统计"""
-    entries = services_logs.read_log_entries(hours_back=hours)
+    entries = _get_entries_cached(hours)
     requests = _get_completed_requests(entries)
     success_count = len([entry for entry in requests if _is_success_request(entry)])
     failed_count = len(requests) - success_count
@@ -60,7 +49,7 @@ def get_search_stats(hours: int):
 
 def get_system_health_stats(hours: int):
     """获取系统健康统计"""
-    entries = services_logs.read_log_entries(hours_back=hours)
+    entries = _get_entries_cached(hours)
     requests = _get_completed_requests(entries)
     error_count = len([entry for entry in entries if entry.get("level") == "ERROR"])
     warning_count = len([entry for entry in entries if entry.get("level") == "WARNING"])
@@ -83,7 +72,7 @@ def get_system_health_stats(hours: int):
 
 def get_real_time_data():
     """获取实时摘要"""
-    entries = services_logs.read_log_entries(hours_back=1)
+    entries = _get_entries_cached(1)
     requests = _get_completed_requests(entries)
     errors = [entry for entry in entries if entry.get("level") == "ERROR"]
 
@@ -98,7 +87,7 @@ def get_real_time_data():
 
 def get_site_performance(hours: int):
     """获取站点性能"""
-    entries = services_logs.read_log_entries(hours_back=hours)
+    entries = _get_entries_cached(hours)
     site_map = {}
     for entry in _get_completed_requests(entries):
         site = str(entry.get("site") or "未知站点")
@@ -141,12 +130,12 @@ def get_site_performance(hours: int):
 
 def get_trends(hours: int):
     """获取趋势数据"""
-    entries = services_logs.read_log_entries(hours_back=hours)
+    entries = _get_entries_cached(hours)
     requests = _get_completed_requests(entries)
     bucket_map = _build_trend_buckets(hours)
 
     for entry in requests:
-        bucket_key = _format_hour_label(int(entry.get("timestamp") or 0))
+        bucket_key = _format_hour_key(int(entry.get("timestamp") or 0))
         if bucket_key not in bucket_map:
             continue
         bucket_map[bucket_key]["search_count"] += 1
@@ -158,21 +147,21 @@ def get_trends(hours: int):
         hours=hours,
         lists=[
             schemas_monitor.TrendPointResponse(
-                label=label,
+                label=data["label"],
                 search_count=data["search_count"],
                 error_count=data["error_count"],
                 average_response_time=round(data["elapsed_total"] / data["search_count"])
                 if data["search_count"]
                 else 0,
             )
-            for label, data in bucket_map.items()
+            for data in bucket_map.values()
         ],
     )
 
 
 def get_hot_keywords(hours: int, limit: int):
     """获取热门关键词"""
-    entries = services_logs.read_log_entries(hours_back=hours)
+    entries = _get_entries_cached(hours)
     keyword_counts = {}
     for entry in entries:
         keyword = _extract_keyword(entry)
@@ -196,6 +185,17 @@ def get_hot_keywords(hours: int, limit: int):
 
 
 """辅助函数"""
+
+
+def _get_entries_cached(hours_back: int):
+    """读取日志条目（带进程内 TTL 缓存）"""
+    now = time.time()
+    cached = _entries_cache.get(hours_back)
+    if cached and now - cached[0] < MONITOR_CACHE_TTL_SECONDS:
+        return cached[1]
+    entries = services_logs.read_log_entries(hours_back=hours_back)
+    _entries_cache[hours_back] = (now, entries)
+    return entries
 
 
 def _get_completed_requests(entries: list[dict]):
@@ -242,14 +242,9 @@ def _build_rate(value: int, total: int):
     return round(value / total * 100, 1)
 
 
-def _minutes_to_hours(minutes: int):
-    """分钟转换为读取小时数"""
-    return max(1, round(minutes / 60))
-
-
-def _format_hour_label(timestamp: int):
-    """格式化小时标签"""
-    return datetime.fromtimestamp(timestamp / 1000).strftime("%m-%d %H:00")
+def _format_hour_key(timestamp: int):
+    """格式化完整小时桶键"""
+    return datetime.fromtimestamp(timestamp / 1000).strftime("%Y-%m-%d %H:00")
 
 
 def _build_trend_buckets(hours: int):
@@ -257,8 +252,10 @@ def _build_trend_buckets(hours: int):
     now = datetime.now().replace(minute=0, second=0, microsecond=0)
     bucket_map = {}
     for index in range(max(1, hours) - 1, -1, -1):
-        label = (now - timedelta(hours=index)).strftime("%m-%d %H:00")
-        bucket_map[label] = {
+        bucket_time = now - timedelta(hours=index)
+        # 桶键使用完整日期小时，避免跨年时 "月-日 时" 撞桶；label 仅用于前端简短显示
+        bucket_map[bucket_time.strftime("%Y-%m-%d %H:00")] = {
+            "label": bucket_time.strftime("%m-%d %H:00"),
             "search_count": 0,
             "error_count": 0,
             "elapsed_total": 0,

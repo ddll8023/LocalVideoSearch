@@ -24,19 +24,6 @@ def query_dashboard_overview():
 
 
 @router.get(
-    "/active-users",
-    response_model=ApiResponse[schemas_monitor.ActiveUsersResponse],
-)
-def query_active_users(minutes: int = Query(30, ge=1, le=1440)):
-    """查询活跃用户统计"""
-    try:
-        result = services_monitor.get_active_users_stats(minutes)
-        return success(data=result)
-    except ServiceException as exc:
-        return error(code=exc.code, message=exc.message)
-
-
-@router.get(
     "/search-stats",
     response_model=ApiResponse[schemas_monitor.SearchStatsResponse],
 )

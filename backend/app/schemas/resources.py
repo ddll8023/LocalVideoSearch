@@ -10,6 +10,37 @@ from app.schemas.response import PaginationInfo
 # ========== 请求类（Request）==========
 
 
+class ResourceSiteCreateRequest(BaseModel):
+    """资源站创建请求"""
+
+    site_id: str = Field(..., min_length=1, max_length=100, description="资源站 ID")
+    name: str = Field(..., min_length=1, max_length=100, description="资源站名称")
+    base_url: str = Field(..., min_length=1, max_length=500, description="资源站 API 地址")
+    enabled: bool = Field(True, description="是否启用")
+    timeout: int = Field(15, ge=1, le=120, description="请求超时时间")
+    search_endpoint: str = Field("wd", min_length=1, max_length=50, description="搜索关键词参数名")
+    page_param: str = Field("pg", min_length=1, max_length=50, description="分页参数名")
+    action_param: str = Field("ac", min_length=1, max_length=50, description="动作参数名")
+
+
+class ResourceSiteUpdateRequest(BaseModel):
+    """资源站更新请求"""
+
+    name: str | None = Field(None, min_length=1, max_length=100, description="资源站名称")
+    base_url: str | None = Field(None, min_length=1, max_length=500, description="资源站 API 地址")
+    enabled: bool | None = Field(None, description="是否启用")
+    timeout: int | None = Field(None, ge=1, le=120, description="请求超时时间")
+    search_endpoint: str | None = Field(None, min_length=1, max_length=50, description="搜索关键词参数名")
+    page_param: str | None = Field(None, min_length=1, max_length=50, description="分页参数名")
+    action_param: str | None = Field(None, min_length=1, max_length=50, description="动作参数名")
+
+
+class ResourceConfigImportRequest(BaseModel):
+    """资源站配置导入请求"""
+
+    sites: list["ResourceSiteResponse"] = Field(..., min_length=1, description="资源站列表")
+
+
 # ========== 响应类（Response）==========
 
 
@@ -72,3 +103,43 @@ class ResourceSiteTestResponse(BaseModel):
     error: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ResourceSiteBatchTestResponse(BaseModel):
+    """资源站批量测试响应"""
+
+    total: int = 0
+    success_count: int = 0
+    failed_count: int = 0
+    results: list[ResourceSiteTestResponse] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ResourceSiteDeleteResponse(BaseModel):
+    """资源站删除响应"""
+
+    site_id: str
+    message: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ResourceConfigExportResponse(BaseModel):
+    """资源站配置导出响应"""
+
+    sites: list[ResourceSiteResponse] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ResourceConfigImportResponse(BaseModel):
+    """资源站配置导入响应"""
+
+    imported_count: int = 0
+    message: str = ""
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+ResourceConfigImportRequest.model_rebuild()

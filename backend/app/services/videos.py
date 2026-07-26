@@ -1,6 +1,7 @@
 """视频搜索服务"""
 import logging
 import math
+import time
 
 import httpx
 
@@ -15,6 +16,10 @@ from app.utils.exception import ServiceException
 
 logger = logging.getLogger(__name__)
 
+SEARCH_CACHE_TTL_SECONDS = 600
+SEARCH_CACHE_MAX_ENTRIES = 128
+_search_cache: dict[tuple, tuple[float, object]] = {}
+
 
 async def query_video_list(query: schemas_videos.VideoSearchRequest):
     """查询视频列表"""
@@ -25,8 +30,8 @@ async def query_video_list(query: schemas_videos.VideoSearchRequest):
 
         site = services_resources.validate_enabled_site(query.site_id)
 
-        async with httpx.AsyncClient() as client:
-            site_result = await fetch_site_raw(client, site, wd, query.page)
+        client = http_client.get_shared_client()
+        site_result = await fetch_site_raw(client, site, wd, query.page)
 
         if not site_result.get("success"):
             raise ServiceException(
@@ -61,7 +66,7 @@ async def query_video_list(query: schemas_videos.VideoSearchRequest):
                     schemas_videos.VideoItemResponse.model_validate(video_data)
                 )
 
-        return schemas_videos.VideoSearchResponse(
+        result = schemas_videos.VideoSearchResponse(
             site_id=site.site_id,
             site_name=site.name,
             lists=videos,
@@ -80,6 +85,8 @@ async def query_video_list(query: schemas_videos.VideoSearchRequest):
             ),
             elapsed_ms=site_result.get("elapsed_ms", 0),
         )
+        _set_cached_search((site.site_id, wd, query.page), result)
+        return result
     except ServiceException:
         raise
     except Exception as exc:
@@ -101,13 +108,15 @@ async def query_video_detail(query: schemas_videos.VideoDetailRequest):
         if not keyword or not vod_id:
             raise ServiceException(ErrorCode.PARAM_ERROR, "参数错误")
 
-        search_query = schemas_videos.VideoSearchRequest(
-            wd=keyword,
-            site_id=query.site_id,
-            page=query.page,
-            page_size=min(settings.MAX_PAGE_SIZE, 100),
-        )
-        search_result = await query_video_list(search_query)
+        search_result = _get_cached_search((query.site_id, keyword, query.page))
+        if search_result is None:
+            search_query = schemas_videos.VideoSearchRequest(
+                wd=keyword,
+                site_id=query.site_id,
+                page=query.page,
+                page_size=settings.DEFAULT_PAGE_SIZE,
+            )
+            search_result = await query_video_list(search_query)
 
         for video in search_result.lists:
             if str(video.id) == str(vod_id):
@@ -154,3 +163,24 @@ async def fetch_site_raw(
 
 
 """辅助函数"""
+
+
+def _get_cached_search(cache_key: tuple):
+    """读取未过期的搜索结果缓存"""
+    entry = _search_cache.get(cache_key)
+    if not entry:
+        return None
+
+    cached_at, value = entry
+    if time.time() - cached_at > SEARCH_CACHE_TTL_SECONDS:
+        _search_cache.pop(cache_key, None)
+        return None
+    return value
+
+
+def _set_cached_search(cache_key: tuple, value):
+    """写入搜索结果缓存，超容量时淘汰最旧条目"""
+    if len(_search_cache) >= SEARCH_CACHE_MAX_ENTRIES:
+        oldest_key = min(_search_cache, key=lambda key: _search_cache[key][0])
+        _search_cache.pop(oldest_key, None)
+    _search_cache[cache_key] = (time.time(), value)

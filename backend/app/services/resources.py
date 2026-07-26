@@ -1,10 +1,9 @@
 """资源站配置服务"""
+import asyncio
 import json
 import logging
-import random
 import shutil
 
-import httpx
 from pydantic import ValidationError
 
 from app.constants import resources as constants_resources
@@ -83,7 +82,7 @@ def toggle_site_enabled(site_id: str):
 async def test_site_connection(site_id: str):
     """测试资源站连接"""
     site = get_site_detail(site_id)
-    test_keyword = random.choice(settings.CONNECTION_TEST_KEYWORDS)
+    test_keyword = settings.CONNECTION_TEST_KEYWORD
     params = http_client.build_params(
         {
             site.action_param: "detail",
@@ -92,16 +91,15 @@ async def test_site_connection(site_id: str):
     )
 
     try:
-        async with httpx.AsyncClient() as client:
-            result = await http_client.request_with_logging(
-                client=client,
-                site_id=site.site_id,
-                site_name=site.name,
-                url=site.base_url,
-                params=params,
-                headers=constants_videos.TEST_HEADERS,
-                timeout=site.timeout,
-            )
+        result = await http_client.request_with_logging(
+            client=http_client.get_shared_client(),
+            site_id=site.site_id,
+            site_name=site.name,
+            url=site.base_url,
+            params=params,
+            headers=constants_videos.TEST_HEADERS,
+            timeout=site.timeout,
+        )
     except ServiceException:
         raise
     except Exception as exc:
@@ -159,6 +157,134 @@ def validate_enabled_site(site_id: str):
     if not site.enabled:
         raise ServiceException(ErrorCode.PARAM_ERROR, "资源站已禁用")
     return site
+
+
+def create_site(data: schemas_resources.ResourceSiteCreateRequest):
+    """新增资源站"""
+    sites = load_resource_config()
+    if any(site.site_id == data.site_id for site in sites):
+        raise ServiceException(ErrorCode.PARAM_ERROR, "资源站ID已存在")
+
+    new_site = schemas_resources.ResourceSiteResponse.model_validate(data.model_dump())
+    sites.append(new_site)
+    save_resource_config(sites)
+    logger.info(f"新增资源站: site_id={new_site.site_id} name={new_site.name}")
+    return new_site
+
+
+def update_site(site_id: str, data: schemas_resources.ResourceSiteUpdateRequest):
+    """更新资源站配置"""
+    site_id = site_id.strip()
+    if not site_id:
+        raise ServiceException(ErrorCode.PARAM_ERROR, "资源站ID不能为空")
+
+    sites = load_resource_config()
+    target_site = None
+    for site in sites:
+        if site.site_id == site_id:
+            target_site = site
+            break
+
+    if not target_site:
+        raise ServiceException(ErrorCode.DATA_NOT_FOUND, "资源站不存在")
+
+    update_data = data.model_dump(exclude_unset=True)
+    if not update_data:
+        raise ServiceException(ErrorCode.PARAM_ERROR, "未提供任何修改字段")
+
+    for key, value in update_data.items():
+        setattr(target_site, key, value)
+
+    save_resource_config(sites)
+    logger.info(f"更新资源站: site_id={site_id} fields={list(update_data)}")
+    return target_site
+
+
+def delete_site(site_id: str):
+    """删除资源站"""
+    site_id = site_id.strip()
+    if not site_id:
+        raise ServiceException(ErrorCode.PARAM_ERROR, "资源站ID不能为空")
+
+    sites = load_resource_config()
+    remaining_sites = [site for site in sites if site.site_id != site_id]
+    if len(remaining_sites) == len(sites):
+        raise ServiceException(ErrorCode.DATA_NOT_FOUND, "资源站不存在")
+
+    save_resource_config(remaining_sites)
+    logger.info(f"删除资源站: site_id={site_id}")
+    return schemas_resources.ResourceSiteDeleteResponse(
+        site_id=site_id,
+        message="资源站已删除",
+    )
+
+
+async def test_enabled_sites():
+    """并发测试所有已启用资源站"""
+    sites = load_resource_config()
+    enabled_sites = [site for site in sites if site.enabled]
+    if not enabled_sites:
+        raise ServiceException(ErrorCode.DATA_NOT_FOUND, "没有已启用的资源站")
+
+    semaphore = asyncio.Semaphore(settings.CONNECTION_TEST_CONCURRENCY)
+
+    async def _test_with_limit(site):
+        async with semaphore:
+            return await test_site_connection(site.site_id)
+
+    raw_results = await asyncio.gather(
+        *[_test_with_limit(site) for site in enabled_sites],
+        return_exceptions=True,
+    )
+
+    results = []
+    for site, raw_result in zip(enabled_sites, raw_results, strict=False):
+        if isinstance(raw_result, BaseException):
+            logger.error(
+                f"批量测试异常: site_id={site.site_id} error={raw_result}",
+            )
+            results.append(
+                schemas_resources.ResourceSiteTestResponse(
+                    site_id=site.site_id,
+                    site_name=site.name,
+                    success=False,
+                    message=constants_resources.CONNECTION_FAILED_MESSAGE,
+                    test_keyword=settings.CONNECTION_TEST_KEYWORD,
+                    error="服务调用失败，请稍后重试",
+                )
+            )
+        else:
+            results.append(raw_result)
+
+    success_count = len([result for result in results if result.success])
+    return schemas_resources.ResourceSiteBatchTestResponse(
+        total=len(results),
+        success_count=success_count,
+        failed_count=len(results) - success_count,
+        results=results,
+    )
+
+
+def export_config():
+    """导出资源站配置"""
+    sites = load_resource_config()
+    return schemas_resources.ResourceConfigExportResponse(sites=sites)
+
+
+def import_config(data: schemas_resources.ResourceConfigImportRequest):
+    """导入资源站配置，整体覆盖"""
+    seen_ids = set()
+    for site in data.sites:
+        if site.site_id in seen_ids:
+            raise ServiceException(ErrorCode.PARAM_ERROR, "导入配置存在重复资源站ID")
+        seen_ids.add(site.site_id)
+
+    save_resource_config(data.sites)
+    logger.info(f"导入资源站配置: count={len(data.sites)}")
+    return schemas_resources.ResourceConfigImportResponse(
+        imported_count=len(data.sites),
+        message="配置导入成功",
+    )
 
 
 def load_resource_config():

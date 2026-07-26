@@ -12,6 +12,24 @@ from app.utils import video_mapper
 
 logger = logging.getLogger(__name__)
 
+_shared_client: httpx.AsyncClient | None = None
+
+
+def get_shared_client():
+    """获取应用级共享 HTTP 客户端，复用连接池"""
+    global _shared_client
+    if _shared_client is None:
+        _shared_client = httpx.AsyncClient()
+    return _shared_client
+
+
+async def close_shared_client():
+    """关闭应用级共享 HTTP 客户端"""
+    global _shared_client
+    if _shared_client is not None:
+        await _shared_client.aclose()
+        _shared_client = None
+
 
 def build_params(param_mapping: dict[str, Any]):
     """构建请求参数"""

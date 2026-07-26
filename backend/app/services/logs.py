@@ -1,5 +1,7 @@
 """日志查询统计服务"""
 from datetime import datetime, timedelta
+import csv
+import io
 import json
 import logging
 import math
@@ -16,8 +18,15 @@ logger = logging.getLogger(__name__)
 
 def query_log_list(query: schemas_logs.LogListRequest):
     """查询日志列表"""
-    entries = read_log_entries()
-    filtered_entries = filter_log_entries(entries, query)
+    records = _read_log_records()
+    filtered_entries = _filter_log_records(
+        records,
+        log_type=query.log_type,
+        level=query.level,
+        start_time=query.start_time,
+        end_time=query.end_time,
+        keyword=query.keyword,
+    )
     total = len(filtered_entries)
     start_index = (query.page - 1) * query.page_size
     end_index = start_index + query.page_size
@@ -40,10 +49,19 @@ def query_log_list(query: schemas_logs.LogListRequest):
 def get_log_stats():
     """获取日志统计"""
     entries = read_log_entries()
-    recent_entries = read_log_entries(hours_back=24)
     levels = _count_by_key(entries, "level")
     types = _count_by_key(entries, "log_type")
     latest_entry = entries[0] if entries else {}
+    # 单次全量读取后在内存中同时统计 24 小时内错误数，避免重复读文件
+    recent_min_timestamp = _get_min_timestamp(24) or 0
+    recent_error_count = len(
+        [
+            entry
+            for entry in entries
+            if entry.get("level") == "ERROR"
+            and int(entry.get("timestamp") or 0) >= recent_min_timestamp
+        ]
+    )
 
     return schemas_logs.LogStatsResponse(
         total=len(entries),
@@ -53,13 +71,38 @@ def get_log_stats():
         system_count=types.get("system", 0),
         request_count=types.get("request", 0),
         operation_count=types.get("operation", 0),
-        recent_error_count=len(
-            [entry for entry in recent_entries if entry.get("level") == "ERROR"]
-        ),
+        recent_error_count=recent_error_count,
         latest_time=str(latest_entry.get("time") or ""),
         levels=levels,
         types=types,
     )
+
+
+def export_logs(query: schemas_logs.LogExportRequest):
+    """导出日志文件"""
+    export_format = (query.export_format or "json").strip().lower()
+    if export_format not in ("json", "csv"):
+        raise ServiceException(ErrorCode.PARAM_ERROR, "导出格式不支持")
+
+    records = _read_log_records()
+    entries = _filter_log_records(
+        records,
+        log_type=query.log_type,
+        level=query.level,
+        start_time=query.start_time,
+        end_time=query.end_time,
+        keyword=query.keyword,
+    )
+    filename = f"logs_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{export_format}"
+    if export_format == "json":
+        content = json.dumps(entries, ensure_ascii=False, indent=2)
+        media_type = "application/json"
+    else:
+        content = _build_csv_content(entries)
+        media_type = "text/csv"
+
+    logger.info(f"日志导出完成: format={export_format} count={len(entries)}")
+    return filename, content, media_type
 
 
 def clear_logs(request: schemas_logs.ClearLogsRequest):
@@ -83,45 +126,58 @@ def clear_logs(request: schemas_logs.ClearLogsRequest):
 
 def read_log_entries(hours_back: int | None = None):
     """读取日志记录"""
+    return [entry for entry, _ in _read_log_records(hours_back)]
+
+
+"""辅助函数"""
+
+
+def _read_log_records(hours_back: int | None = None):
+    """读取日志记录及原始行文本"""
     try:
-        entries = []
+        records = []
         min_timestamp = _get_min_timestamp(hours_back)
         for log_path in _get_log_paths():
-            entries.extend(_read_log_file(log_path, min_timestamp))
-        entries.sort(key=lambda item: int(item.get("timestamp") or 0), reverse=True)
-        return entries
+            records.extend(_read_log_file(log_path, min_timestamp))
+        records.sort(key=lambda item: int(item[0].get("timestamp") or 0), reverse=True)
+        return records
     except OSError as exc:
         logger.error(f"日志读取失败: error={exc}", exc_info=True)
         raise ServiceException(ErrorCode.INTERNAL_ERROR, "日志读取失败") from exc
 
 
-def filter_log_entries(entries: list[dict], query: schemas_logs.LogListRequest):
+def _filter_log_records(
+    records: list[tuple[dict, str]],
+    log_type: str | None,
+    level: str | None,
+    start_time: str | None,
+    end_time: str | None,
+    keyword: str | None,
+):
     """过滤日志记录"""
-    start_timestamp = _parse_time_to_timestamp(query.start_time)
-    end_timestamp = _parse_time_to_timestamp(query.end_time)
-    keyword = (query.keyword or "").strip().lower()
-    log_type = (query.log_type or "").strip()
-    level = (query.level or "").strip().upper()
+    start_timestamp = _parse_time_to_timestamp(start_time)
+    end_timestamp = _parse_time_to_timestamp(end_time)
+    keyword_lower = (keyword or "").strip().lower()
+    log_type_text = (log_type or "").strip()
+    level_text = (level or "").strip().upper()
 
     filtered_entries = []
-    for entry in entries:
+    for entry, raw_line_lower in records:
         entry_timestamp = int(entry.get("timestamp") or 0)
-        if log_type and entry.get("log_type") != log_type:
+        if log_type_text and entry.get("log_type") != log_type_text:
             continue
-        if level and str(entry.get("level") or "").upper() != level:
+        if level_text and str(entry.get("level") or "").upper() != level_text:
             continue
         if start_timestamp and entry_timestamp < start_timestamp:
             continue
         if end_timestamp and entry_timestamp > end_timestamp:
             continue
-        if keyword and keyword not in json.dumps(entry, ensure_ascii=False).lower():
+        # 关键词直接匹配原始行小写文本，避免逐条 json.dumps 的序列化开销
+        if keyword_lower and keyword_lower not in raw_line_lower:
             continue
         filtered_entries.append(entry)
 
     return filtered_entries
-
-
-"""辅助函数"""
 
 
 def _get_min_timestamp(hours_back: int | None):
@@ -148,7 +204,7 @@ def _get_backup_log_paths():
 
 def _read_log_file(log_path: Path, min_timestamp: int | None):
     """读取单个日志文件"""
-    entries = []
+    records = []
     with log_path.open("r", encoding="utf-8") as file_obj:
         for line in file_obj:
             entry = _parse_log_line(line)
@@ -157,8 +213,8 @@ def _read_log_file(log_path: Path, min_timestamp: int | None):
             timestamp = int(entry.get("timestamp") or 0)
             if min_timestamp and timestamp < min_timestamp:
                 continue
-            entries.append(entry)
-    return entries
+            records.append((entry, line.strip().lower()))
+    return records
 
 
 def _parse_log_line(line: str):
@@ -210,3 +266,20 @@ def _count_by_key(entries: list[dict], key: str):
             continue
         counts[value] = counts.get(value, 0) + 1
     return counts
+
+
+def _build_csv_content(entries: list[dict]):
+    """构建 CSV 导出内容"""
+    core_fields = ["timestamp", "time", "log_type", "level", "logger_name", "message"]
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow([*core_fields, "extra"])
+    for entry in entries:
+        extra = {key: value for key, value in entry.items() if key not in core_fields}
+        writer.writerow(
+            [
+                *(entry.get(field, "") for field in core_fields),
+                json.dumps(extra, ensure_ascii=False),
+            ]
+        )
+    return buffer.getvalue()

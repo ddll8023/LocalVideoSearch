@@ -3,17 +3,24 @@
     class="group overflow-hidden rounded-md border border-zinc-200 bg-white transition duration-200 hover:border-primary-500 hover:shadow-lift hover:-translate-y-0.5"
     :to="to"
   >
-    <div class="aspect-[4/5] bg-zinc-100">
+    <div class="relative aspect-[4/5] bg-zinc-100">
       <img
-        v-if="video.thumbnail"
+        v-if="video.thumbnail && !imageFailed"
         class="h-full w-full object-cover"
         :src="video.thumbnail"
         :alt="video.title"
         loading="lazy"
+        @error="imageFailed = true"
       />
       <div v-else class="flex h-full items-center justify-center text-zinc-300">
         <font-awesome-icon :icon="['fas', 'film']" class="text-3xl" aria-hidden="true" />
       </div>
+      <span
+        v-if="scoreText"
+        class="absolute right-1.5 top-1.5 rounded bg-black/60 px-1.5 py-0.5 text-xs font-semibold text-amber-300"
+      >
+        {{ scoreText }}
+      </span>
     </div>
     <div class="space-y-1 p-2">
       <h2 class="line-clamp-2 text-sm font-semibold text-zinc-900 group-hover:text-primary-700">
@@ -30,12 +37,27 @@
 <script setup>
 /**
  * 视频搜索结果卡片
- * 功能描述：展示视频封面、标题和基础元信息
+ * 功能描述：展示视频封面、标题、评分角标和基础元信息，封面加载失败时降级为占位图
  */
+import { computed, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
-defineProps({
+const props = defineProps({
   video: { type: Object, required: true },
   to: { type: Object, required: true }
+})
+
+const imageFailed = ref(false)
+
+watch(
+  () => props.video?.thumbnail,
+  () => {
+    imageFailed.value = false
+  }
+)
+
+const scoreText = computed(() => {
+  const score = Number(props.video?.score)
+  return Number.isFinite(score) && score > 0 ? score.toFixed(1) : ''
 })
 </script>

@@ -11,7 +11,11 @@
           <option :value="24">24 小时</option>
           <option :value="72">72 小时</option>
         </select>
-        <button class="toolbar-button" type="button" :disabled="loading" @click="loadMonitorData">
+        <button class="toolbar-button" type="button" @click="toggleAutoRefresh">
+          <font-awesome-icon :icon="['fas', autoRefreshPaused ? 'play' : 'pause']" aria-hidden="true" />
+          <span>{{ autoRefreshPaused ? '恢复刷新' : '暂停刷新' }}</span>
+        </button>
+        <button class="toolbar-button" type="button" :disabled="loading" @click="handleManualRefresh">
           <font-awesome-icon :icon="['fas', 'rotate']" aria-hidden="true" />
           <span>刷新</span>
         </button>
@@ -20,7 +24,7 @@
 
     <AppAlert v-if="error" :message="error" show-retry @retry="loadMonitorData" />
 
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <div v-for="item in summaryItems" :key="item.label" class="surface rounded-lg p-5">
         <div class="flex items-center justify-between gap-3">
           <p class="text-sm text-zinc-500">{{ item.label }}</p>
@@ -39,19 +43,8 @@
           <h1 class="text-lg font-semibold text-zinc-900">搜索趋势</h1>
           <span class="text-xs text-zinc-500">每小时聚合</span>
         </div>
-        <div v-if="trendItems.length" class="mt-5 flex h-64 items-end gap-2 overflow-x-auto pb-2">
-          <div v-for="item in trendItems" :key="item.label" class="flex min-w-12 flex-1 flex-col items-center gap-2">
-            <div class="flex h-48 w-full items-end rounded bg-zinc-100">
-              <div
-                class="w-full rounded bg-primary-600 transition"
-                :style="{ height: `${getTrendHeight(item.search_count)}%` }"
-                :title="`${item.label}：${item.search_count} 次`"
-              />
-            </div>
-            <span class="w-16 truncate text-center text-[11px] text-zinc-500">{{ item.label.slice(6) }}</span>
-          </div>
-        </div>
-        <AppEmptyState v-else title="暂无趋势数据" description="产生请求日志后会显示搜索趋势。" :framed="false" />
+        <div v-show="trendItems.length" ref="trendChartRef" class="mt-5 h-64 w-full" />
+        <AppEmptyState v-if="!trendItems.length" title="暂无趋势数据" description="产生请求日志后会显示搜索趋势。" :framed="false" />
       </section>
 
       <section class="surface rounded-lg p-5">
@@ -99,18 +92,8 @@
 
       <section class="surface rounded-lg p-5">
         <h1 class="text-lg font-semibold text-zinc-900">热门关键词</h1>
-        <div v-if="keywordItems.length" class="mt-5 space-y-3">
-          <div v-for="item in keywordItems" :key="item.keyword" class="space-y-2">
-            <div class="flex items-center justify-between gap-3 text-sm">
-              <span class="truncate text-zinc-900">{{ item.keyword }}</span>
-              <span class="text-zinc-500">{{ item.count }}</span>
-            </div>
-            <div class="h-2 rounded bg-zinc-100">
-              <div class="h-2 rounded bg-amber-500" :style="{ width: `${getKeywordWidth(item.count)}%` }" />
-            </div>
-          </div>
-        </div>
-        <AppEmptyState v-else title="暂无关键词数据" description="搜索请求日志中包含关键词后会显示排名。" :framed="false" />
+        <div v-show="keywordItems.length" ref="keywordChartRef" class="mt-5 h-80 w-full" />
+        <AppEmptyState v-if="!keywordItems.length" title="暂无关键词数据" description="搜索请求日志中包含关键词后会显示排名。" :framed="false" />
       </section>
     </div>
   </section>
@@ -119,12 +102,18 @@
 <script setup>
 /**
  * 系统监控页
- * 功能描述：展示后端监控聚合摘要、趋势、站点性能和热门关键词
+ * 功能描述：展示后端监控聚合摘要、ECharts 趋势/关键词图表、站点性能和系统健康
+ * 依赖组件：AppAlert、AppEmptyState、AppLoadingState
  */
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 
+import { BarChart } from 'echarts/charts'
+import { GridComponent, TooltipComponent } from 'echarts/components'
+import * as echarts from 'echarts/core'
+import { CanvasRenderer } from 'echarts/renderers'
+
+import { useToastStore } from '@/stores/toast'
 import {
-  getActiveUsers,
   getDashboardOverview,
   getHotKeywords,
   getRealTimeSummary,
@@ -137,10 +126,13 @@ import AppAlert from '@/components/base/AppAlert.vue'
 import AppEmptyState from '@/components/base/AppEmptyState.vue'
 import AppLoadingState from '@/components/base/AppLoadingState.vue'
 
+echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer])
+
+const toast = useToastStore()
+
 const loading = ref(false)
 const error = ref('')
 const dashboard = ref({})
-const activeUsers = ref({})
 const searchStats = ref({})
 const health = ref({})
 const realTime = ref({})
@@ -149,15 +141,14 @@ const trends = ref({})
 const hotKeywords = ref({})
 const hours = ref(24)
 const hasLoaded = ref(false)
+const autoRefreshPaused = ref(false)
+const trendChartRef = ref(null)
+const keywordChartRef = ref(null)
 let refreshTimer = null
+let trendChart = null
+let keywordChart = null
 
 const summaryItems = computed(() => [
-  {
-    label: '活跃用户',
-    value: activeUsers.value.active_users ?? dashboard.value.active_users ?? 0,
-    description: `${activeUsers.value.minutes ?? 30} 分钟活动`,
-    icon: ['fas', 'circle-check']
-  },
   {
     label: '搜索次数',
     value: searchStats.value.total_searches ?? dashboard.value.search_count ?? 0,
@@ -181,8 +172,6 @@ const summaryItems = computed(() => [
 const trendItems = computed(() => trends.value.lists || [])
 const siteItems = computed(() => sitePerformance.value.lists || [])
 const keywordItems = computed(() => hotKeywords.value.lists || [])
-const maxTrendCount = computed(() => Math.max(...trendItems.value.map((item) => item.search_count), 1))
-const maxKeywordCount = computed(() => Math.max(...keywordItems.value.map((item) => item.count), 1))
 
 const healthStatusLabel = computed(() => {
   const status = health.value.status || 'healthy'
@@ -208,7 +197,6 @@ const loadMonitorData = async () => {
   try {
     const [
       response,
-      activeResponse,
       searchResponse,
       healthResponse,
       realTimeResponse,
@@ -217,7 +205,6 @@ const loadMonitorData = async () => {
       keywordResponse
     ] = await Promise.all([
       getDashboardOverview(),
-      getActiveUsers({ minutes: 30 }),
       getSearchStats({ hours: hours.value }),
       getSystemHealth({ hours: hours.value }),
       getRealTimeSummary(),
@@ -226,7 +213,6 @@ const loadMonitorData = async () => {
       getHotKeywords({ hours: hours.value, limit: 10 })
     ])
     dashboard.value = response.data || {}
-    activeUsers.value = activeResponse.data || {}
     searchStats.value = searchResponse.data || {}
     health.value = healthResponse.data || {}
     realTime.value = realTimeResponse.data || {}
@@ -241,17 +227,156 @@ const loadMonitorData = async () => {
   }
 }
 
-const getTrendHeight = (count) => Math.max(4, Math.round((count / maxTrendCount.value) * 100))
-const getKeywordWidth = (count) => Math.max(6, Math.round((count / maxKeywordCount.value) * 100))
+/**
+ * 手动刷新：成功后弹出提示
+ */
+const handleManualRefresh = async () => {
+  await loadMonitorData()
+  if (!error.value) {
+    toast.success('监控数据已刷新')
+  }
+}
+
+/**
+ * 暂停/恢复 30 秒自动刷新
+ */
+const toggleAutoRefresh = () => {
+  autoRefreshPaused.value = !autoRefreshPaused.value
+  if (autoRefreshPaused.value) {
+    stopAutoRefresh()
+  } else {
+    startAutoRefresh()
+  }
+}
+
+const startAutoRefresh = () => {
+  if (refreshTimer) return
+  refreshTimer = window.setInterval(loadMonitorData, 30000)
+}
+
+const stopAutoRefresh = () => {
+  if (refreshTimer) {
+    window.clearInterval(refreshTimer)
+    refreshTimer = null
+  }
+}
+
+/**
+ * 更新搜索趋势柱状图（X 轴使用后端桶的 label 字段）
+ */
+const updateTrendChart = async () => {
+  if (!trendItems.value.length) return
+  await nextTick()
+  if (!trendChart && trendChartRef.value) {
+    trendChart = echarts.init(trendChartRef.value)
+  }
+  if (!trendChart) return
+  trendChart.resize()
+  trendChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params) => {
+        const point = params[0]
+        return `${point.name}<br/>搜索 ${point.value} 次`
+      }
+    },
+    grid: { left: 8, right: 8, top: 24, bottom: 8, containLabel: true },
+    xAxis: {
+      type: 'category',
+      data: trendItems.value.map((item) => item.label),
+      axisLine: { lineStyle: { color: '#e4e4e7' } },
+      axisTick: { show: false },
+      axisLabel: { color: '#71717a', fontSize: 11 }
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      splitLine: { lineStyle: { color: '#f4f4f5' } },
+      axisLabel: { color: '#71717a', fontSize: 11 }
+    },
+    series: [
+      {
+        type: 'bar',
+        data: trendItems.value.map((item) => item.search_count),
+        barMaxWidth: 28,
+        itemStyle: { color: '#0f766e', borderRadius: [4, 4, 0, 0] }
+      }
+    ]
+  })
+}
+
+/**
+ * 更新热门关键词横向条形图（次数最多的关键词显示在顶部）
+ */
+const updateKeywordChart = async () => {
+  if (!keywordItems.value.length) return
+  await nextTick()
+  if (!keywordChart && keywordChartRef.value) {
+    keywordChart = echarts.init(keywordChartRef.value)
+  }
+  if (!keywordChart) return
+  const items = [...keywordItems.value].reverse()
+  keywordChart.resize()
+  keywordChart.setOption({
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
+      formatter: (params) => {
+        const point = params[0]
+        return `${point.name}<br/>${point.value} 次`
+      }
+    },
+    grid: { left: 8, right: 16, top: 8, bottom: 8, containLabel: true },
+    xAxis: {
+      type: 'value',
+      minInterval: 1,
+      splitLine: { lineStyle: { color: '#f4f4f5' } },
+      axisLabel: { color: '#71717a', fontSize: 11 }
+    },
+    yAxis: {
+      type: 'category',
+      data: items.map((item) => item.keyword),
+      axisLine: { lineStyle: { color: '#e4e4e7' } },
+      axisTick: { show: false },
+      axisLabel: { color: '#3f3f46', fontSize: 12, width: 96, overflow: 'truncate' }
+    },
+    series: [
+      {
+        type: 'bar',
+        data: items.map((item) => item.count),
+        barMaxWidth: 16,
+        itemStyle: { color: '#f59e0b', borderRadius: [0, 4, 4, 0] }
+      }
+    ]
+  })
+}
+
+const handleChartResize = () => {
+  trendChart?.resize()
+  keywordChart?.resize()
+}
+
+watch(trendItems, updateTrendChart)
+watch(keywordItems, updateKeywordChart)
 
 onMounted(() => {
   loadMonitorData()
-  refreshTimer = window.setInterval(loadMonitorData, 30000)
+  startAutoRefresh()
+  updateTrendChart()
+  updateKeywordChart()
+  window.addEventListener('resize', handleChartResize)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleChartResize)
+  trendChart?.dispose()
+  keywordChart?.dispose()
+  trendChart = null
+  keywordChart = null
 })
 
 onUnmounted(() => {
-  if (refreshTimer) {
-    window.clearInterval(refreshTimer)
-  }
+  stopAutoRefresh()
 })
 </script>

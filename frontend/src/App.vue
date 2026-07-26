@@ -40,21 +40,27 @@
         </transition>
       </RouterView>
     </main>
+
+    <AppToast />
   </div>
 </template>
 
 <script setup>
 /**
  * 应用根组件
- * 功能描述：提供桌面端全局导航、窗口控制和路由出口
+ * 功能描述：提供桌面端全局导航、窗口控制、路由出口和全局消息提示
+ * 依赖组件：AppToast
  */
 import { computed, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
+
+import AppToast from '@/components/base/AppToast.vue'
 
 const route = useRoute()
 
 const navItems = [
   { name: '搜索', to: '/', icon: ['fas', 'magnifying-glass'] },
+  { name: '收藏', to: '/favorites', icon: ['fas', 'heart'] },
   { name: '设置', to: '/settings', icon: ['fas', 'gear'] },
   { name: '监控', to: '/admin/system-monitor', icon: ['fas', 'chart-line'] },
   { name: '日志', to: '/admin/system-logs', icon: ['fas', 'list'] }

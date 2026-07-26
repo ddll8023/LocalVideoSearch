@@ -4,12 +4,6 @@ export function getDashboardOverview() {
   return request.get('/api/v1/monitor/dashboard')
 }
 
-export function getActiveUsers({ minutes = 30 } = {}) {
-  return request.get('/api/v1/monitor/active-users', {
-    params: { minutes }
-  })
-}
-
 export function getSearchStats({ hours = 24 } = {}) {
   return request.get('/api/v1/monitor/search-stats', {
     params: { hours }

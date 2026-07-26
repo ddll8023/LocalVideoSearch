@@ -5,12 +5,20 @@
         <h1 class="text-2xl font-semibold text-zinc-900">系统日志</h1>
         <p class="mt-1 text-sm text-zinc-500">系统、请求和操作日志。</p>
       </div>
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap items-center gap-2">
         <button class="toolbar-button" type="button" :disabled="loading" @click="loadPageData">
           <font-awesome-icon :icon="['fas', 'rotate']" aria-hidden="true" />
           <span>刷新</span>
         </button>
-        <button class="toolbar-button text-red-600 hover:border-red-300 hover:text-red-700" type="button" :disabled="loading" @click="handleClearLogs">
+        <select v-model="exportFormat" class="field-input w-24" aria-label="导出格式">
+          <option value="json">JSON</option>
+          <option value="csv">CSV</option>
+        </select>
+        <button class="toolbar-button" type="button" :disabled="exporting" @click="handleExportLogs">
+          <font-awesome-icon :icon="['fas', exporting ? 'spinner' : 'file-export']" :class="{ 'fa-spin': exporting }" aria-hidden="true" />
+          <span>导出</span>
+        </button>
+        <button class="toolbar-button text-red-600 hover:border-red-300 hover:text-red-700" type="button" :disabled="loading" @click="clearConfirmVisible = true">
           <font-awesome-icon :icon="['fas', 'ban']" aria-hidden="true" />
           <span>清理</span>
         </button>
@@ -81,41 +89,57 @@
       </div>
     </div>
 
-    <div v-if="selectedLog" class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/40 p-4" @click.self="selectedLog = null">
-      <section class="max-h-[80vh] w-full max-w-3xl overflow-hidden rounded-lg bg-white shadow-lift">
-        <header class="flex items-center justify-between gap-4 border-b border-zinc-100 px-5 py-4">
-          <div>
-            <h1 class="text-lg font-semibold text-zinc-900">日志详情</h1>
-            <p class="mt-1 text-xs text-zinc-500">{{ selectedLog.time || selectedLog.timestamp }}</p>
-          </div>
-          <button class="toolbar-button" type="button" @click="selectedLog = null">关闭</button>
-        </header>
-        <div class="max-h-[60vh] overflow-auto p-5">
-          <dl class="grid gap-3 text-sm sm:grid-cols-2">
-            <div v-for="item in selectedLogFields" :key="item.label" class="rounded-md border border-zinc-100 bg-zinc-50 p-3">
-              <dt class="text-xs text-zinc-500">{{ item.label }}</dt>
-              <dd class="mt-1 break-words text-zinc-900">{{ item.value }}</dd>
-            </div>
-          </dl>
-          <pre v-if="selectedLog.exception" class="mt-4 max-h-64 overflow-auto rounded-md bg-zinc-950 p-4 text-xs leading-6 text-zinc-100">{{ selectedLog.exception }}</pre>
+    <AppModal v-model="detailVisible" title="日志详情" max-width="max-w-2xl">
+      <p class="text-xs text-zinc-500">{{ selectedLog?.time || selectedLog?.timestamp }}</p>
+      <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+        <div v-for="item in selectedLogFields" :key="item.label" class="rounded-md border border-zinc-100 bg-zinc-50 p-3">
+          <dt class="text-xs text-zinc-500">{{ item.label }}</dt>
+          <dd class="mt-1 break-words text-zinc-900">{{ item.value }}</dd>
         </div>
-      </section>
-    </div>
+      </dl>
+      <pre v-if="selectedLog?.exception" class="mt-4 max-h-64 overflow-auto rounded-md bg-zinc-950 p-4 text-xs leading-6 text-zinc-100">{{ selectedLog.exception }}</pre>
+
+      <template #footer>
+        <div class="flex justify-end gap-2">
+          <button class="toolbar-button" type="button" @click="handleCopyLog">
+            <font-awesome-icon :icon="['fas', 'copy']" aria-hidden="true" />
+            <span>复制日志</span>
+          </button>
+          <button class="toolbar-button" type="button" @click="detailVisible = false">关闭</button>
+        </div>
+      </template>
+    </AppModal>
+
+    <AppConfirm
+      v-model="clearConfirmVisible"
+      title="清理日志"
+      message="确认清理当前日志？将同时清理轮转备份，此操作不可恢复。"
+      confirm-text="确认清理"
+      danger
+      :loading="clearLoading"
+      @confirm="handleConfirmClear"
+    />
   </section>
 </template>
 
 <script setup>
 /**
  * 系统日志页
- * 功能描述：查询、过滤、分页、查看和清理系统日志
+ * 功能描述：查询、过滤、分页、查看、导出和清理系统日志
+ * 依赖组件：AppAlert、AppConfirm、AppEmptyState、AppLoadingState、AppModal、AppPagination
  */
 import { computed, onMounted, reactive, ref } from 'vue'
 
-import { clearLogs, getLogStats, querySystemLogs } from '@/api/logs'
+import { useToastStore } from '@/stores/toast'
+import { clearLogs, exportLogs, getLogStats, querySystemLogs } from '@/api/logs'
 import AppAlert from '@/components/base/AppAlert.vue'
+import AppConfirm from '@/components/base/AppConfirm.vue'
 import AppEmptyState from '@/components/base/AppEmptyState.vue'
 import AppLoadingState from '@/components/base/AppLoadingState.vue'
+import AppModal from '@/components/base/AppModal.vue'
 import AppPagination from '@/components/base/AppPagination.vue'
+
+const toast = useToastStore()
 
 const filters = reactive({
   logType: '',
@@ -135,6 +159,10 @@ const pagination = ref({
 const loading = ref(false)
 const error = ref('')
 const selectedLog = ref(null)
+const exportFormat = ref('json')
+const exporting = ref(false)
+const clearConfirmVisible = ref(false)
+const clearLoading = ref(false)
 
 const typeLabelMap = {
   system: '系统',
@@ -154,6 +182,13 @@ const statItems = computed(() => [
   { label: '最近错误', value: stats.value.recent_error_count ?? 0, icon: ['fas', 'triangle-exclamation'] },
   { label: '最新时间', value: stats.value.latest_time || '-', icon: ['fas', 'clock-rotate-left'] }
 ])
+
+const detailVisible = computed({
+  get: () => Boolean(selectedLog.value),
+  set: (value) => {
+    if (!value) selectedLog.value = null
+  }
+})
 
 const selectedLogFields = computed(() => {
   if (!selectedLog.value) return []
@@ -218,19 +253,81 @@ const handlePageChange = (page) => {
   loadPageData()
 }
 
-const handleClearLogs = async () => {
-  if (!window.confirm('确认清理当前日志和轮转日志？')) return
-  loading.value = true
+/**
+ * 复制当前日志详情为格式化 JSON
+ */
+const handleCopyLog = async () => {
+  if (!selectedLog.value) return
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(selectedLog.value, null, 2))
+    toast.success('日志已复制')
+  } catch {
+    toast.error('复制失败，请检查剪贴板权限')
+  }
+}
+
+/**
+ * 从 Content-Disposition 响应头解析下载文件名
+ */
+const parseDispositionFilename = (disposition) => {
+  if (!disposition) return ''
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match) return decodeURIComponent(utf8Match[1])
+  const plainMatch = disposition.match(/filename="?([^";]+)"?/i)
+  return plainMatch ? plainMatch[1] : ''
+}
+
+/**
+ * 按当前筛选条件导出日志文件
+ */
+const handleExportLogs = async () => {
+  exporting.value = true
+  try {
+    const response = await exportLogs({
+      logType: filters.logType || undefined,
+      level: filters.level || undefined,
+      startTime: filters.startTime || undefined,
+      endTime: filters.endTime || undefined,
+      keyword: filters.keyword || undefined,
+      exportFormat: exportFormat.value
+    })
+    const filename =
+      parseDispositionFilename(response.headers['content-disposition']) ||
+      `logs_export.${exportFormat.value === 'csv' ? 'csv' : 'json'}`
+    const objectUrl = URL.createObjectURL(response.data)
+    const link = document.createElement('a')
+    link.href = objectUrl
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(objectUrl)
+    toast.success('日志导出成功')
+  } catch (exportError) {
+    toast.error(exportError.message || '日志导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
+
+/**
+ * 确认清理当前日志及轮转备份
+ */
+const handleConfirmClear = async () => {
+  clearLoading.value = true
   error.value = ''
   try {
     await clearLogs({ includeBackups: true })
     selectedLog.value = null
     pagination.value.page = 1
+    clearConfirmVisible.value = false
+    toast.success('日志已清理')
     await loadPageData()
   } catch (clearError) {
+    clearConfirmVisible.value = false
     error.value = clearError.message
   } finally {
-    loading.value = false
+    clearLoading.value = false
   }
 }
 

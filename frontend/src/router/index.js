@@ -14,6 +14,11 @@ const router = createRouter({
       component: () => import('@/views/user/Settings.vue')
     },
     {
+      path: '/favorites',
+      name: 'Favorites',
+      component: () => import('@/views/user/Favorites.vue')
+    },
+    {
       path: '/video/:siteId/:vodId',
       name: 'VideoDetail',
       component: () => import('@/views/user/VideoDetail.vue'),
@@ -34,7 +39,9 @@ const router = createRouter({
         keyword: route.query.keyword,
         page: route.query.page,
         url: route.query.url,
-        title: route.query.title
+        title: route.query.title,
+        line: route.query.line,
+        episode: route.query.episode
       })
     },
     {

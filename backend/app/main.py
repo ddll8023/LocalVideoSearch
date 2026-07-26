@@ -10,7 +10,9 @@ from fastapi.responses import JSONResponse
 from app.api.v1 import router as v1_router
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.db.database import init_db
 from app.schemas.response import ErrorCode, error
+from app.utils import http_client
 
 
 logger = logging.getLogger(__name__)
@@ -22,8 +24,11 @@ async def lifespan(app: FastAPI):
     settings.APP_DATA_DIR.mkdir(parents=True, exist_ok=True)
     settings.LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     setup_logging()
+    init_db()
+    http_client.get_shared_client()
     logger.info(f"{settings.APP_NAME} 后端启动: env={settings.APP_ENV}")
     yield
+    await http_client.close_shared_client()
     logger.info(f"{settings.APP_NAME} 后端关闭")
 
 

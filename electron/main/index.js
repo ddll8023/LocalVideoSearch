@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, dialog, ipcMain } = require('electron')
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const http = require('node:http')
@@ -298,9 +298,10 @@ ipcMain.handle('window:is-maximized', () => {
   return mainWindow ? mainWindow.isMaximized() : false
 })
 
-app.whenReady().then(async () => {
+async function ensureBackendOrShowError() {
+  let state
   try {
-    await startBackend()
+    state = await startBackend()
   } catch (error) {
     backendState = {
       ...backendState,
@@ -308,6 +309,36 @@ app.whenReady().then(async () => {
       status: 'error',
       error: error.message
     }
+    state = backendState
+  }
+
+  if (state.running) {
+    return true
+  }
+
+  const { response } = await dialog.showMessageBox({
+    type: 'error',
+    title: 'VideoSearch',
+    message: '后端服务启动失败',
+    detail: `${state.error || '未知错误'}\n\n可以点击"重试"重新启动后端服务，或退出应用后检查安装是否完整。`,
+    buttons: ['重试', '退出'],
+    defaultId: 0,
+    cancelId: 1
+  })
+
+  if (response === 0) {
+    await stopBackend()
+    return ensureBackendOrShowError()
+  }
+
+  app.quit()
+  return false
+}
+
+app.whenReady().then(async () => {
+  const backendReady = await ensureBackendOrShowError()
+  if (!backendReady) {
+    return
   }
 
   createWindow()

@@ -47,23 +47,11 @@ class HotKeywordItemResponse(BaseModel):
 class DashboardOverviewResponse(BaseModel):
     """仪表板概览响应"""
 
-    active_users: int = 0
     search_count: int = 0
     success_rate: float = 0
     average_response_time: int = 0
     error_count: int = 0
     request_count: int = 0
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class ActiveUsersResponse(BaseModel):
-    """活跃用户响应"""
-
-    minutes: int = 30
-    active_users: int = 0
-    request_count: int = 0
-    operation_count: int = 0
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -16,6 +16,16 @@ class PlayEpisodeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class PlayLineResponse(BaseModel):
+    """播放线路响应"""
+
+    name: str = ""
+    format: str = "mp4"
+    episodes: list[PlayEpisodeResponse] = Field(default_factory=list)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class FilterStatsResponse(BaseModel):
     """视频过滤统计响应"""
 
@@ -62,12 +72,16 @@ class VideoItemResponse(BaseModel):
     upload_date: str = ""
     channel: str = ""
     actor: str = ""
+    director: str = ""
+    score: str = ""
+    total_episodes: str = ""
+    update_time: str = ""
     area: str = ""
     language: str = ""
     year: str = ""
     status: str = ""
     type_name: str = ""
-    play_sources: dict[str, list[PlayEpisodeResponse]] = Field(default_factory=dict)
+    play_sources: list[PlayLineResponse] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 
