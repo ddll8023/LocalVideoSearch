@@ -7,7 +7,6 @@ import shutil
 from pydantic import ValidationError
 
 from app.constants import resources as constants_resources
-from app.constants import videos as constants_videos
 from app.core.config import settings
 from app.schemas import resources as schemas_resources
 from app.schemas.response import ErrorCode, PaginationInfo
@@ -97,7 +96,7 @@ async def test_site_connection(site_id: str):
             site_name=site.name,
             url=site.base_url,
             params=params,
-            headers=constants_videos.TEST_HEADERS,
+            headers=constants_resources.TEST_HEADERS,
             timeout=site.timeout,
         )
     except ServiceException:

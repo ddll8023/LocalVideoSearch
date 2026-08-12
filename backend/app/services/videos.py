@@ -159,6 +159,7 @@ async def fetch_site_raw(
         params=params,
         headers=constants_videos.SEARCH_HEADERS,
         timeout=site.timeout,
+        data_counter=lambda data: len(video_mapper.extract_video_items(data)),
     )
 
 

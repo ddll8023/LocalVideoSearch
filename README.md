@@ -1,250 +1,314 @@
 # VideoSearch v0.1.0
 
-VideoSearch 是一个本机运行的桌面端视频搜索工具，使用 `Vue 3 + Electron + FastAPI` 构建。
+VideoSearch 是一款本机运行的视频聚合搜索桌面应用。它通过 Electron 启动本地 FastAPI 服务，由 Vue 界面并发检索多个已启用资源站，统一展示视频详情和播放线路，并在本机保存搜索历史、收藏、观看进度、日志与监控数据。
 
-项目通过 Electron 创建桌面窗口，由主进程启动本地 FastAPI 子进程，前端渲染进程通过 Axios 调用本机后端接口完成资源站搜索、视频详情、播放源解析、日志查看和系统监控等功能。
+> 当前桌面打包目标为 **Windows**；macOS 提供开发启动脚本，尚未配置对应安装包。
+
+## 核心能力
+
+- **多源搜索**：按启用站点并发搜索，逐站展示搜索中、成功或失败状态，失败站点可单独重试。
+- **视频详情**：统一整理海报、简介、演职员、年份、评分、状态和按线路分组的剧集。
+- **视频播放**：基于 Artplayer 与 HLS.js 播放 HLS 或普通媒体地址，支持线路/剧集切换、倍速、画中画、全屏和自动连播。
+- **个人数据**：在本地保存搜索历史、收藏和观看位置，并在首页提供继续观看入口。
+- **资源站管理**：支持站点增删改、启停、单站/批量连接测试，以及配置导入导出。
+- **日志与监控**：支持日志筛选、分页、详情、JSON/CSV 导出和清理，并聚合请求趋势、站点性能、热门关键词和健康状态。
+- **桌面编排**：Electron 自动启动后端、等待健康检查、处理启动失败重试，并提供无边框窗口控制。
+
+## 系统结构
+
+```mermaid
+flowchart LR
+    User[用户] --> Desktop[Electron 桌面壳]
+    Desktop --> UI[Vue 前端]
+    Desktop --> Backend[FastAPI 本地后端]
+    UI --> Backend
+    Backend --> Sites[第三方资源站]
+    Backend --> Data[(SQLite)]
+    Backend --> Files[配置与日志]
+    Sites --> Media[外部媒体地址]
+    UI --> Media
+```
+
+- Electron 负责桌面窗口和本地后端进程生命周期。
+- Vue 前端负责页面交互、并发搜索状态、播放器和数据可视化。
+- FastAPI 后端负责资源站配置、外部请求、数据适配、个人数据和日志统计。
+- SQLite 与本地文件保存单机用户数据，不依赖远程账号服务。
 
 ## 技术栈
 
-| 模块        | 技术                                                                        |
-| ----------- | --------------------------------------------------------------------------- |
-| 桌面端      | Electron                                                                    |
-| 前端        | Vue 3、Pinia、Vue Router、Axios、Tailwind CSS、FontAwesome、HLS.js、ECharts |
-| 后端        | FastAPI、Pydantic Settings、HTTPX、Uvicorn                                  |
-| Python 环境 | uv、`backend/.venv/`                                                      |
-| 打包        | electron-builder、PyInstaller、免安装目录版、NSIS                              |
+版本约束来自当前依赖清单；实际锁定版本见对应 lock 文件或[模块说明文档](./doc/模块说明文档.md)。
 
-## 功能模块
+| 范围 | 技术 |
+|---|---|
+| 桌面端 | Electron `^43.2.0`、electron-builder `^26.15.3` |
+| 前端 | Vue `^3.5.13`、Pinia `^3.0.1`、Vue Router `^4.5.0`、Axios `^1.7.9` |
+| 播放与图表 | Artplayer `^5.4.0`、HLS.js `^1.5.20`、ECharts `^5.5.1` |
+| 样式与构建 | Tailwind CSS `^3.4.17`、Vite `^6.0.7`、FontAwesome 6 |
+| 后端 | Python `>=3.11`、FastAPI `>=0.115.0`、Uvicorn `>=0.30.0` |
+| 数据与外部请求 | SQLAlchemy `>=2.0.51`、SQLite、HTTPX `>=0.27.0` |
+| 环境与打包 | uv、Pydantic Settings、PyInstaller、NSIS |
 
-- 视频搜索：按启用资源站并发搜索，按站点展示结果。
-- 视频详情：定位资源站视频详情并解析播放源。
-- 视频播放：支持 `m3u8` 和普通视频 URL 播放。
-- 资源站管理：支持启用、禁用、连接测试和批量测试。
-- 系统日志：支持日志查询、过滤、分页、详情查看和清理。
-- 系统监控：基于日志聚合运行状态、搜索统计、站点性能和热门关键词。
-
-## 目录结构
+## 项目结构
 
 ```text
-VideoSearch/
-├── backend/                 # FastAPI 后端
+LocalVideoSearch/
+├── backend/                 # FastAPI 后端、SQLite 数据层和 PyInstaller 入口
 │   ├── app/
-│   ├── entry.py             # PyInstaller 打包入口
+│   ├── entry.py
 │   ├── pyproject.toml
-│   └── .venv/               # uv 管理的 Python 虚拟环境
-├── electron/                # Electron 主进程和 preload
-│   ├── main/
-│   └── preload/
-├── frontend/                # Vue 3 前端
-│   ├── src/
-│   ├── index.html
-│   ├── package.json
-│   └── vite.config.js
-├── resources/               # 默认资源站配置
-│   └── resource_sites.json
-├── doc/                     # 设计文档
-├── 规范文档/                # 前后端编码规范
-├── package.json             # Electron 启动和打包配置
+│   └── uv.lock
+├── electron/                # Electron 主进程与 preload 安全桥接
+├── frontend/                # Vue 3 前端及 Vite/Tailwind 配置
+├── resources/               # 首次运行使用的默认资源站配置
+├── doc/                     # 项目结构导航和业务模块说明
+├── 规范文档/                # 前后端开发规范入口
+├── package.json             # Electron 启动与 Windows 打包配置
 └── README.md
 ```
 
-## 端口约定
+完整目录职责和逐文件说明见[项目结构导航文档](./doc/项目结构文档.md)。
 
-| 服务               | 地址                      |
-| ------------------ | ------------------------- |
-| 前端 Vite 开发服务 | `http://127.0.0.1:4739` |
-| FastAPI 后端服务   | `http://127.0.0.1:4740` |
+## 环境要求
 
-Electron 主进程会在启动时使用固定后端端口 `4740` 启动 FastAPI，并通过 preload 向前端暴露后端地址。
+请先安装：
 
-## 环境准备
+- Node.js 与 npm（项目未固定具体版本）
+- Python 3.11 或更高版本
+- [uv](https://docs.astral.sh/uv/)
 
-需要本机已安装：
+开发态后端虚拟环境必须位于 `backend/.venv/`。Electron 会按平台查找：
 
-- Node.js
-- npm
-- Python 3.11+
-- uv
+- Windows：`backend/.venv/Scripts/python.exe`
+- macOS / Linux：`backend/.venv/bin/python`
 
-安装根目录依赖：
+## 安装依赖
 
-```powershell
-cd D:\demo\electron\VideoSearch
+在项目根目录执行：
+
+```bash
 npm install
-```
-
-安装前端依赖：
-
-```powershell
-cd D:\demo\electron\VideoSearch\frontend
-npm install
-```
-
-准备后端虚拟环境：
-
-```powershell
-cd D:\demo\electron\VideoSearch
+npm --prefix frontend install
 uv sync --directory backend
 ```
 
-后端虚拟环境必须位于：
-
-```text
-backend/.venv/
-```
-
-Electron 主进程会固定查找：
-
-```text
-backend/.venv/Scripts/python.exe
-```
+三条命令分别安装 Electron、前端和 Python 后端依赖。
 
 ## 开发运行
 
-启动前端开发服务：
+### 一键启动
 
-```powershell
-cd D:\demo\electron\VideoSearch\frontend
-npm run dev
+依赖安装完成后：
+
+**macOS**
+
+```bash
+./start-dev.command
 ```
 
-启动 Electron：
+> `start-dev.command` 会先尝试结束占用 `4739`、`4740` 端口的进程，再启动 Vite 和 Electron。执行前请确认这些端口上没有其他需要保留的服务。
 
-```powershell
-cd D:\demo\electron\VideoSearch
+**Windows**
+
+```bat
+start-dev.bat
+```
+
+两个脚本都会先启动前端开发服务，再启动 Electron；Electron 会自动启动本地 FastAPI 后端。
+
+### 手动启动
+
+使用两个终端，在项目根目录分别执行：
+
+```bash
+# 终端 1：前端开发服务
+npm --prefix frontend run dev
+```
+
+```bash
+# 终端 2：Electron；会自动启动后端
 npm run electron
 ```
 
-开发模式下，Electron 默认加载：
+### 单独调试后端
 
-```text
-http://127.0.0.1:4739
+```bash
+uv run --directory backend uvicorn app.main:app \
+  --host 127.0.0.1 \
+  --port 4740 \
+  --reload
 ```
 
-并自动启动本地 FastAPI：
+Windows 也可以运行 `start-backend.bat`。单独打开前端而不启动 Electron 时，需要同时运行此后端服务。
 
-```text
-http://127.0.0.1:4740
+## 端口与运行配置
+
+| 服务 | 默认地址 | 说明 |
+|---|---|---|
+| Vite 开发服务 | `http://127.0.0.1:4739` | 仅开发态使用 |
+| FastAPI 本地服务 | `http://127.0.0.1:4740` | Electron 启动后端并等待健康检查通过 |
+
+后端支持通过环境变量或 `backend/.env` 覆盖配置；Electron 桌面模式会明确传入固定主机、端口和应用数据目录。
+
+| 配置项 | 默认值 | 适用范围 |
+|---|---|---|
+| `API_HOST` | `127.0.0.1` | 后端监听地址；桌面模式固定为本机回环地址 |
+| `API_PORT` | `4740` | 后端端口；桌面模式固定使用该端口 |
+| `APP_DATA_DIR` | 按平台推导 | 配置、数据库和日志的可写目录 |
+| `VITE_API_BASE_URL` | `http://127.0.0.1:4740` | 不通过 Electron 运行前端时的后端地址 |
+
+普通接口使用统一响应结构：
+
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {}
+}
 ```
 
-## Windows 免安装目录版
+`code === 0` 表示业务成功；日志文件下载直接返回二进制响应，不使用该响应壳。
 
-打包前确认以下内容存在：
+## 应用数据
+
+桌面模式将运行数据写入 Electron 提供的用户应用数据目录：
+
+| 系统 | 典型目录 |
+|---|---|
+| Windows | `%APPDATA%\VideoSearch\` |
+| macOS | `~/Library/Application Support/VideoSearch/` |
+| Linux | Electron 的应用数据目录下 `VideoSearch/` |
+
+单独运行后端且未设置 `APP_DATA_DIR` 时，Linux 默认使用 `~/.local/share/VideoSearch/`。
 
 ```text
-backend/.venv/Scripts/python.exe
-resources/resource_sites.json
+VideoSearch/
+├── resource_sites.json      # 用户可写的资源站配置
+├── video_search.db          # 搜索历史、收藏和播放记录
+└── logs/
+    ├── video_search.log     # 当前 JSON Lines 日志
+    └── video_search.log.*   # 轮转备份（存在时）
 ```
 
-执行打包：
+默认站点来自项目内的 `resources/resource_sites.json`。首次需要配置时会复制到用户数据目录，之后的增删改、启停和导入操作只修改用户副本。
 
-```powershell
-cd D:\demo\electron\VideoSearch
+## 可用脚本
+
+### 根目录
+
+| 命令 | 作用 |
+|---|---|
+| `npm run electron` | 启动 Electron，并自动编排本地后端 |
+| `npm run build:frontend` | 构建前端生产文件 |
+| `npm run build:backend` | 使用 PyInstaller 构建 Windows 后端可执行文件 |
+| `npm run dist:dir` | 构建 Windows 免安装目录版 |
+| `npm run dist:win` | 构建 Windows NSIS 安装包 |
+
+### 前端
+
+| 命令 | 作用 |
+|---|---|
+| `npm --prefix frontend run dev` | 启动 Vite 开发服务 |
+| `npm --prefix frontend run build` | 构建前端生产文件 |
+| `npm --prefix frontend run preview` | 预览前端构建结果 |
+| `npm --prefix frontend run lint` | 检查前端 JavaScript 与 Vue 文件 |
+
+## Windows 打包
+
+当前打包配置只声明 Windows 目录版和 NSIS 安装包。以下命令应在 Windows 环境执行，因为 PyInstaller 生成当前平台的后端程序，打包配置要求 `backend.exe`。
+
+### 免安装目录版
+
+```bash
 npm run dist:dir
 ```
 
-打包脚本执行流程：
+构建顺序：
 
-1. 前端构建：`npm --prefix frontend run build`
-2. 后端打包：`uv run --directory backend pyinstaller --onefile --name backend backend/entry.py`
-3. Electron 打包：`electron-builder --win dir` 生成免安装目录版
+1. Vite 生成前端生产文件。
+2. PyInstaller 生成 `backend/dist/backend.exe`。
+3. electron-builder 将桌面代码、前端产物、后端程序和默认资源组装到 `release/win-unpacked/`。
 
-构建产物输出目录：
-
-```text
-release/win-unpacked/
-```
-
-直接打开以下文件即可启动软件：
+启动文件：
 
 ```text
 release/win-unpacked/VideoSearch.exe
 ```
 
-需要桌面入口时，对 `VideoSearch.exe` 创建快捷方式即可。
+必须分发完整的 `win-unpacked` 目录，不能只复制 `VideoSearch.exe`。
 
-注意：不能只复制单独的 `VideoSearch.exe`。必须保留整个 `win-unpacked` 目录，因为后端、前端构建产物和资源文件都在同级资源目录中。
+### NSIS 安装包
 
-如需生成安装包，可执行：
-
-```powershell
-cd D:\demo\electron\VideoSearch
+```bash
 npm run dist:win
 ```
 
-## 打包资源说明
+产物写入 `release/`，安装时允许选择目录，并创建桌面与开始菜单快捷方式。
 
-当前 `electron-builder` 配置会将以下内容复制到安装包资源目录：
+### 打包资源映射
 
-| 源路径                  | 打包后路径                                    |
-| ----------------------- | --------------------------------------------- |
-| `backend/dist/backend.exe` | `process.resourcesPath/backend/backend.exe` |
-| `frontend/dist`         | `process.resourcesPath/frontend/dist`         |
-| `resources`             | `process.resourcesPath/resources`             |
+| 源路径 | 打包后位置 |
+|---|---|
+| `backend/dist/backend.exe` | `resources/backend/backend.exe` |
+| `frontend/dist/` | `resources/frontend/dist/` |
+| `resources/` | `resources/resources/` |
 
-打包后 Electron 会从以下位置加载前端页面：
+打包后运行不依赖用户本机的 Python 虚拟环境。
 
-```text
-process.resourcesPath/frontend/dist/index.html
-```
+## 数据与外部依赖说明
 
-并从以下位置启动后端（PyInstaller 单文件 exe，无需 Python 环境）：
-
-```text
-process.resourcesPath/backend/backend.exe
-```
-
-## 应用数据目录
-
-桌面端运行数据写入 Windows 用户应用数据目录：
-
-```text
-%APPDATA%/VideoSearch/
-├── resource_sites.json
-└── logs/
-    └── video_search.log
-```
-
-默认资源站配置来自项目内：
-
-```text
-resources/resource_sites.json
-```
-
-运行时会复制到应用数据目录，后续启用、禁用等配置修改会写入应用数据目录中的可写配置文件。
+- 搜索关键词会发送到用户启用的第三方资源站；视频播放会直接访问第三方媒体地址。
+- 搜索历史、收藏、观看记录、配置和日志保存在本机，不提供账号、云同步或多用户隔离。
+- 日志可能包含搜索关键词、资源站地址、耗时和错误信息，但当前不会自动上传到远程服务。
+- 收藏和观看记录只保存关键词，不保存原搜索页码；来自后续结果页的视频在回访时可能无法重新定位。
+- 第三方接口结构、服务可用性和媒体地址均不受本项目控制；单站失败不会阻断其他站点。
+- 当前播放器不提供 DRM、字幕管理或离线下载能力。
 
 ## 常见问题
 
-### 后端启动失败：Backend executable not found
+### 开发态提示找不到后端 Python
 
-说明 `backend/dist/backend.exe` 不存在。需要先执行后端打包：
+确认已执行：
 
-```powershell
+```bash
+uv sync --directory backend
+```
+
+并检查平台对应的虚拟环境解释器是否存在：
+
+```text
+backend/.venv/Scripts/python.exe   # Windows
+backend/.venv/bin/python           # macOS / Linux
+```
+
+### 打包时提示 `Backend executable not found`
+
+先构建后端：
+
+```bash
 npm run build:backend
 ```
 
+确认 `backend/dist/backend.exe` 存在后再运行 Electron 打包命令。
+
+### Electron 打开后无法加载开发页面
+
+确认 Vite 已在 `127.0.0.1:4739` 运行，再执行 `npm run electron`。
+
+### 后端健康检查超时或端口占用
+
+桌面模式固定使用 `127.0.0.1:4740`。停止占用该端口的进程后重试；macOS 一键脚本会主动尝试清理该端口。
+
 ### 打包后页面空白或静态资源加载失败
 
-确认 `frontend/vite.config.js` 中包含：
+前端构建必须使用相对资源基址。检查 Vite 配置中的 `base` 是否仍为 `./`，并确认 `frontend/dist/` 已完整打入应用资源目录。
 
-```javascript
-base: './'
-```
+### 某个资源站搜索或测试失败
 
-该配置用于适配 Electron 打包后通过 `loadFile()` 加载本地页面。
-
-### 端口占用
-
-当前后端固定使用：
-
-```text
-127.0.0.1:4740
-```
-
-如果该端口被其他进程占用，FastAPI 子进程会启动失败，需要先释放端口后再启动应用。
+先在设置页单独测试该站点。超时、异常状态、无法解析的数据或反爬页面只会标记该站点失败，不影响其他站点。
 
 ## 相关文档
 
-- `doc/开发设计文档.md`
-- `规范文档/后端规范文档.md`
-- `规范文档/前端规范文档.md`
+- [项目结构导航文档](./doc/项目结构文档.md)：绝对路径、目录职责、逐文件功能和问题定位入口。
+- [模块说明文档](./doc/模块说明文档.md)：业务功能、模块边界、依赖关系和典型闭环。
+- [后端规范文档](./规范文档/后端规范文档.md)：Python/FastAPI 开发规范入口。
+- [前端规范文档](./规范文档/前端规范文档.md)：Vue JavaScript 开发规范入口。

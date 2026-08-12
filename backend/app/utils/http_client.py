@@ -1,4 +1,5 @@
-"""资源站 HTTP 请求工具"""
+"""第三方 HTTP 请求工具"""
+from collections.abc import Callable
 import json
 import logging
 import time
@@ -7,7 +8,6 @@ from typing import Any
 import httpx
 
 from app.core.logging import RequestLogger
-from app.utils import video_mapper
 
 
 logger = logging.getLogger(__name__)
@@ -44,6 +44,7 @@ async def request_with_logging(
     params: dict[str, Any],
     headers: dict[str, str],
     timeout: int = 15,
+    data_counter: Callable[[Any], int] | None = None,
 ):
     """发送 HTTP 请求并记录日志"""
     request_logger = RequestLogger(site_name=site_name)
@@ -90,7 +91,7 @@ async def request_with_logging(
                 "site_id": site_id,
             }
 
-        data_count = len(video_mapper.extract_video_items(data))
+        data_count = data_counter(data) if data_counter else 0
         request_logger.log_request_success(
             request_id=request_id,
             status_code=response.status_code,
