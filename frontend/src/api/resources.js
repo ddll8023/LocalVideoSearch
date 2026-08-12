@@ -1,19 +1,19 @@
 import request from '@/utils/request'
 
 export function getResourceSites() {
-  return request.get('/api/v1/resources/sites')
+  return request.post('/api/v1/resources/sites/list', {})
 }
 
 export function getResourceSiteDetail(siteId) {
-  return request.get(`/api/v1/resources/sites/${siteId}`)
+  return request.post('/api/v1/resources/sites/detail', { site_id: siteId })
 }
 
 export function toggleResourceSite(siteId) {
-  return request.post(`/api/v1/resources/sites/${siteId}/toggle`)
+  return request.post('/api/v1/resources/sites/toggle', { site_id: siteId })
 }
 
 export function testResourceSite(siteId) {
-  return request.post(`/api/v1/resources/sites/${siteId}/test`)
+  return request.post('/api/v1/resources/sites/test', { site_id: siteId })
 }
 
 /**
@@ -32,7 +32,10 @@ export function createResourceSite(siteData) {
  * @returns {Promise} 更新后站点
  */
 export function updateResourceSite(siteId, siteData) {
-  return request.put(`/api/v1/resources/sites/${siteId}`, siteData)
+  return request.post('/api/v1/resources/sites/update', {
+    site_id: siteId,
+    ...siteData
+  })
 }
 
 /**
@@ -41,7 +44,7 @@ export function updateResourceSite(siteId, siteData) {
  * @returns {Promise} 删除结果
  */
 export function deleteResourceSite(siteId) {
-  return request.delete(`/api/v1/resources/sites/${siteId}`)
+  return request.post('/api/v1/resources/sites/delete', { site_id: siteId })
 }
 
 /**
@@ -49,7 +52,7 @@ export function deleteResourceSite(siteId) {
  * @returns {Promise} 批量测试结果（total/success_count/failed_count/results）
  */
 export function testAllResourceSites() {
-  return request.post('/api/v1/resources/sites/test-all')
+  return request.post('/api/v1/resources/sites/test-all', {})
 }
 
 /**
@@ -57,7 +60,7 @@ export function testAllResourceSites() {
  * @returns {Promise} 配置数据（sites 数组）
  */
 export function exportResourceConfig() {
-  return request.get('/api/v1/resources/config/export')
+  return request.post('/api/v1/resources/config/export', {})
 }
 
 /**
@@ -68,4 +71,3 @@ export function exportResourceConfig() {
 export function importResourceConfig(sites) {
   return request.post('/api/v1/resources/config/import', { sites })
 }
-

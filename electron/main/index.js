@@ -58,32 +58,43 @@ function getRendererFilePath() {
 
 function requestBackendHealth(baseUrl) {
   return new Promise((resolve) => {
-    const request = http.get(`${baseUrl}/api/v1/health`, (response) => {
-      let body = ''
-      response.setEncoding('utf8')
-      response.on('data', (chunk) => {
-        body += chunk
-      })
-      response.on('end', () => {
-        if (response.statusCode < 200 || response.statusCode >= 300) {
-          resolve(false)
-          return
+    const request = http.request(
+      `${baseUrl}/api/v1/health`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': 2
         }
+      },
+      (response) => {
+        let body = ''
+        response.setEncoding('utf8')
+        response.on('data', (chunk) => {
+          body += chunk
+        })
+        response.on('end', () => {
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            resolve(false)
+            return
+          }
 
-        try {
-          const payload = JSON.parse(body)
-          resolve(payload.code === 0)
-        } catch {
-          resolve(false)
-        }
-      })
-    })
+          try {
+            const payload = JSON.parse(body)
+            resolve(payload.code === 0)
+          } catch {
+            resolve(false)
+          }
+        })
+      }
+    )
 
     request.on('error', () => resolve(false))
     request.setTimeout(1000, () => {
       request.destroy()
       resolve(false)
     })
+    request.end('{}')
   })
 }
 

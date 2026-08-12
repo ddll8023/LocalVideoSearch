@@ -2,6 +2,12 @@
 from pydantic import BaseModel, ConfigDict
 
 
+class HealthRequest(BaseModel):
+    """健康检查请求"""
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class HealthResponse(BaseModel):
     """健康检查响应"""
 

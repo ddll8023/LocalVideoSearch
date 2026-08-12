@@ -10,6 +10,26 @@ from pydantic import BaseModel, ConfigDict, Field
 # ========== 请求类（Request）==========
 
 
+class FavoriteListRequest(BaseModel):
+    """收藏列表请求"""
+
+    page: int = Field(1, ge=1, description="页码")
+    page_size: int = Field(20, ge=1, le=100, description="每页数量")
+
+
+class FavoriteStatusRequest(BaseModel):
+    """收藏状态查询请求"""
+
+    site_id: str = Field(..., min_length=1, max_length=50, description="资源站 ID")
+    vod_id: str = Field(..., min_length=1, max_length=50, description="视频 ID")
+
+
+class FavoriteDeleteRequest(BaseModel):
+    """收藏删除请求"""
+
+    favorite_id: int = Field(..., ge=1, description="收藏 ID")
+
+
 class FavoriteCreateRequest(BaseModel):
     """收藏创建请求"""
 

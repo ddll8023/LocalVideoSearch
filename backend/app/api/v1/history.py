@@ -1,5 +1,5 @@
 """搜索历史 API"""
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
@@ -12,24 +12,24 @@ from app.utils.exception import ServiceException
 router = APIRouter(prefix="/history", tags=["history"])
 
 
-@router.get(
-    "",
+@router.post(
+    "/list",
     response_model=ApiResponse[PaginatedResponse[schemas_history.SearchHistoryItemResponse]],
 )
 def query_search_history_list(
-    limit: int = Query(10, ge=1, le=50, description="返回条数"),
+    data: schemas_history.SearchHistoryListRequest,
     db: Session = Depends(get_db),
 ):
     """查询最近搜索历史"""
     try:
-        result = services_history.get_history_list(limit, db)
+        result = services_history.get_history_list(data.limit, db)
         return success(data=result)
     except ServiceException as exc:
         return error(code=exc.code, message=exc.message)
 
 
 @router.post(
-    "",
+    "/record",
     response_model=ApiResponse[schemas_history.SearchHistoryItemResponse],
 )
 def record_search_history(
@@ -44,24 +44,30 @@ def record_search_history(
         return error(code=exc.code, message=exc.message)
 
 
-@router.delete(
-    "/{history_id}",
+@router.post(
+    "/delete",
     response_model=ApiResponse[schemas_history.SearchHistoryDeleteResponse],
 )
-def delete_search_history(history_id: int, db: Session = Depends(get_db)):
+def delete_search_history(
+    data: schemas_history.SearchHistoryDeleteRequest,
+    db: Session = Depends(get_db),
+):
     """删除单条搜索历史"""
     try:
-        result = services_history.delete_history(history_id, db)
+        result = services_history.delete_history(data.history_id, db)
         return success(data=result)
     except ServiceException as exc:
         return error(code=exc.code, message=exc.message)
 
 
-@router.delete(
-    "",
+@router.post(
+    "/clear",
     response_model=ApiResponse[schemas_history.SearchHistoryDeleteResponse],
 )
-def clear_search_history(db: Session = Depends(get_db)):
+def clear_search_history(
+    _request: schemas_history.SearchHistoryClearRequest,
+    db: Session = Depends(get_db),
+):
     """清空搜索历史"""
     try:
         result = services_history.clear_history(db)

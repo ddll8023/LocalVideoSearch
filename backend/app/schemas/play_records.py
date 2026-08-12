@@ -10,6 +10,32 @@ from pydantic import BaseModel, ConfigDict, Field
 # ========== 请求类（Request）==========
 
 
+class PlayRecordListRequest(BaseModel):
+    """播放记录列表请求"""
+
+    page: int = Field(1, ge=1, description="页码")
+    page_size: int = Field(20, ge=1, le=100, description="每页数量")
+
+
+class PlayRecordDetailRequest(BaseModel):
+    """播放记录详情请求"""
+
+    site_id: str = Field(..., min_length=1, max_length=50, description="资源站 ID")
+    vod_id: str = Field(..., min_length=1, max_length=50, description="视频 ID")
+
+
+class PlayRecordDeleteRequest(BaseModel):
+    """播放记录删除请求"""
+
+    record_id: int = Field(..., ge=1, description="播放记录 ID")
+
+
+class PlayRecordClearRequest(BaseModel):
+    """播放记录清空请求"""
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class PlayRecordUpsertRequest(BaseModel):
     """播放记录写入请求"""
 

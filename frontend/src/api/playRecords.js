@@ -6,8 +6,9 @@ import request from '@/utils/request'
  * @returns {Promise} 播放记录列表
  */
 export function getPlayRecords({ page = 1, pageSize = 20 } = {}) {
-  return request.get('/api/v1/play-records', {
-    params: { page, page_size: pageSize }
+  return request.post('/api/v1/play-records/list', {
+    page,
+    page_size: pageSize
   })
 }
 
@@ -17,8 +18,9 @@ export function getPlayRecords({ page = 1, pageSize = 20 } = {}) {
  * @returns {Promise} 播放记录，不存在时 data 为 null
  */
 export function getPlayRecordDetail({ siteId, vodId }) {
-  return request.get('/api/v1/play-records/detail', {
-    params: { site_id: siteId, vod_id: vodId }
+  return request.post('/api/v1/play-records/detail', {
+    site_id: siteId,
+    vod_id: vodId
   })
 }
 
@@ -39,7 +41,7 @@ export function upsertPlayRecord({
   positionSeconds,
   durationSeconds
 }) {
-  return request.put('/api/v1/play-records', {
+  return request.post('/api/v1/play-records/upsert', {
     site_id: siteId,
     vod_id: vodId,
     title,
@@ -59,7 +61,7 @@ export function upsertPlayRecord({
  * @returns {Promise} 删除结果
  */
 export function deletePlayRecord(recordId) {
-  return request.delete(`/api/v1/play-records/${recordId}`)
+  return request.post('/api/v1/play-records/delete', { record_id: recordId })
 }
 
 /**
@@ -67,5 +69,5 @@ export function deletePlayRecord(recordId) {
  * @returns {Promise} 清空结果
  */
 export function clearPlayRecords() {
-  return request.delete('/api/v1/play-records')
+  return request.post('/api/v1/play-records/clear', {})
 }

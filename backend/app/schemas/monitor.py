@@ -41,6 +41,31 @@ class HotKeywordItemResponse(BaseModel):
 # ========== 请求类（Request）==========
 
 
+class DashboardRequest(BaseModel):
+    """仪表板概览请求"""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class MonitorWindowRequest(BaseModel):
+    """监控时间窗口请求"""
+
+    hours: int = Field(24, ge=1, le=168, description="统计时间范围（小时）")
+
+
+class RealTimeRequest(BaseModel):
+    """实时摘要请求"""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class HotKeywordsRequest(BaseModel):
+    """热门关键词请求"""
+
+    hours: int = Field(24, ge=1, le=168, description="统计时间范围（小时）")
+    limit: int = Field(10, ge=1, le=50, description="返回数量")
+
+
 # ========== 响应类（Response）==========
 
 

@@ -10,6 +10,48 @@ from app.schemas.response import PaginationInfo
 # ========== 请求类（Request）==========
 
 
+class ResourceSiteListRequest(BaseModel):
+    """资源站列表查询请求"""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ResourceSiteDetailRequest(BaseModel):
+    """资源站详情查询请求"""
+
+    site_id: str = Field(..., min_length=1, max_length=100, description="资源站 ID")
+
+
+class ResourceSiteToggleRequest(BaseModel):
+    """资源站启停请求"""
+
+    site_id: str = Field(..., min_length=1, max_length=100, description="资源站 ID")
+
+
+class ResourceSiteTestRequest(BaseModel):
+    """资源站连接测试请求"""
+
+    site_id: str = Field(..., min_length=1, max_length=100, description="资源站 ID")
+
+
+class ResourceSiteDeleteRequest(BaseModel):
+    """资源站删除请求"""
+
+    site_id: str = Field(..., min_length=1, max_length=100, description="资源站 ID")
+
+
+class ResourceSiteBatchTestRequest(BaseModel):
+    """资源站批量测试请求"""
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ResourceConfigExportRequest(BaseModel):
+    """资源站配置导出请求"""
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class ResourceSiteCreateRequest(BaseModel):
     """资源站创建请求"""
 
@@ -24,7 +66,7 @@ class ResourceSiteCreateRequest(BaseModel):
 
 
 class ResourceSiteUpdateRequest(BaseModel):
-    """资源站更新请求"""
+    """资源站更新字段请求"""
 
     name: str | None = Field(None, min_length=1, max_length=100, description="资源站名称")
     base_url: str | None = Field(None, min_length=1, max_length=500, description="资源站 API 地址")
@@ -33,6 +75,12 @@ class ResourceSiteUpdateRequest(BaseModel):
     search_endpoint: str | None = Field(None, min_length=1, max_length=50, description="搜索关键词参数名")
     page_param: str | None = Field(None, min_length=1, max_length=50, description="分页参数名")
     action_param: str | None = Field(None, min_length=1, max_length=50, description="动作参数名")
+
+
+class ResourceSiteUpdateActionRequest(ResourceSiteUpdateRequest):
+    """资源站更新操作请求"""
+
+    site_id: str = Field(..., min_length=1, max_length=100, description="资源站 ID")
 
 
 class ResourceConfigImportRequest(BaseModel):

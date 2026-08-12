@@ -6,15 +6,16 @@ import request from '@/utils/request'
  * @returns {Promise} 搜索结果
  */
 export function searchVideos({ wd, siteId, page = 1, pageSize = 20, signal }) {
-  return request.get('/api/v1/videos/search', {
-    params: {
+  return request.post(
+    '/api/v1/videos/search',
+    {
       wd,
       site_id: siteId,
       page,
       page_size: pageSize
     },
-    signal
-  })
+    { signal }
+  )
 }
 
 /**
@@ -23,12 +24,10 @@ export function searchVideos({ wd, siteId, page = 1, pageSize = 20, signal }) {
  * @returns {Promise} 视频详情
  */
 export function getVideoDetail({ keyword, siteId, vodId, page = 1 }) {
-  return request.get('/api/v1/videos/detail', {
-    params: {
-      keyword,
-      site_id: siteId,
-      vod_id: vodId,
-      page
-    }
+  return request.post('/api/v1/videos/detail', {
+    keyword,
+    site_id: siteId,
+    vod_id: vodId,
+    page
   })
 }

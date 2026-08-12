@@ -20,6 +20,12 @@ class LogListRequest(BaseModel):
     keyword: str | None = Field(None, description="关键词")
 
 
+class LogStatsRequest(BaseModel):
+    """日志统计请求"""
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class LogExportRequest(BaseModel):
     """日志导出请求"""
 

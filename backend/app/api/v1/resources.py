@@ -10,11 +10,11 @@ from app.utils.exception import ServiceException
 router = APIRouter(prefix="/resources", tags=["resources"])
 
 
-@router.get(
-    "/sites",
+@router.post(
+    "/sites/list",
     response_model=ApiResponse[schemas_resources.ResourceSiteListResponse],
 )
-def query_resource_site_list():
+def query_resource_site_list(_request: schemas_resources.ResourceSiteListRequest):
     """查询资源站列表"""
     try:
         result = services_resources.get_site_list()
@@ -23,40 +23,40 @@ def query_resource_site_list():
         return error(code=exc.code, message=exc.message)
 
 
-@router.get(
-    "/sites/{site_id}",
+@router.post(
+    "/sites/detail",
     response_model=ApiResponse[schemas_resources.ResourceSiteResponse],
 )
-def query_resource_site_detail(site_id: str):
+def query_resource_site_detail(data: schemas_resources.ResourceSiteDetailRequest):
     """查询资源站详情"""
     try:
-        result = services_resources.get_site_detail(site_id)
+        result = services_resources.get_site_detail(data.site_id)
         return success(data=result)
     except ServiceException as exc:
         return error(code=exc.code, message=exc.message)
 
 
 @router.post(
-    "/sites/{site_id}/toggle",
+    "/sites/toggle",
     response_model=ApiResponse[schemas_resources.ResourceSiteToggleResponse],
 )
-def toggle_resource_site(site_id: str):
+def toggle_resource_site(data: schemas_resources.ResourceSiteToggleRequest):
     """切换资源站启用状态"""
     try:
-        result = services_resources.toggle_site_enabled(site_id)
+        result = services_resources.toggle_site_enabled(data.site_id)
         return success(data=result)
     except ServiceException as exc:
         return error(code=exc.code, message=exc.message)
 
 
 @router.post(
-    "/sites/{site_id}/test",
+    "/sites/test",
     response_model=ApiResponse[schemas_resources.ResourceSiteTestResponse],
 )
-async def test_resource_site(site_id: str):
+async def test_resource_site(data: schemas_resources.ResourceSiteTestRequest):
     """测试资源站连接"""
     try:
-        result = await services_resources.test_site_connection(site_id)
+        result = await services_resources.test_site_connection(data.site_id)
         return success(data=result)
     except ServiceException as exc:
         return error(code=exc.code, message=exc.message)
@@ -75,27 +75,30 @@ def create_resource_site(data: schemas_resources.ResourceSiteCreateRequest):
         return error(code=exc.code, message=exc.message)
 
 
-@router.put(
-    "/sites/{site_id}",
+@router.post(
+    "/sites/update",
     response_model=ApiResponse[schemas_resources.ResourceSiteResponse],
 )
-def update_resource_site(site_id: str, data: schemas_resources.ResourceSiteUpdateRequest):
+def update_resource_site(data: schemas_resources.ResourceSiteUpdateActionRequest):
     """更新资源站配置"""
     try:
-        result = services_resources.update_site(site_id, data)
+        update_data = schemas_resources.ResourceSiteUpdateRequest.model_validate(
+            data.model_dump(exclude={"site_id"}, exclude_unset=True)
+        )
+        result = services_resources.update_site(data.site_id, update_data)
         return success(data=result)
     except ServiceException as exc:
         return error(code=exc.code, message=exc.message)
 
 
-@router.delete(
-    "/sites/{site_id}",
+@router.post(
+    "/sites/delete",
     response_model=ApiResponse[schemas_resources.ResourceSiteDeleteResponse],
 )
-def delete_resource_site(site_id: str):
+def delete_resource_site(data: schemas_resources.ResourceSiteDeleteRequest):
     """删除资源站"""
     try:
-        result = services_resources.delete_site(site_id)
+        result = services_resources.delete_site(data.site_id)
         return success(data=result)
     except ServiceException as exc:
         return error(code=exc.code, message=exc.message)
@@ -105,7 +108,9 @@ def delete_resource_site(site_id: str):
     "/sites/test-all",
     response_model=ApiResponse[schemas_resources.ResourceSiteBatchTestResponse],
 )
-async def test_all_resource_sites():
+async def test_all_resource_sites(
+    _request: schemas_resources.ResourceSiteBatchTestRequest,
+):
     """批量测试所有已启用资源站"""
     try:
         result = await services_resources.test_enabled_sites()
@@ -114,11 +119,11 @@ async def test_all_resource_sites():
         return error(code=exc.code, message=exc.message)
 
 
-@router.get(
+@router.post(
     "/config/export",
     response_model=ApiResponse[schemas_resources.ResourceConfigExportResponse],
 )
-def export_resource_config():
+def export_resource_config(_request: schemas_resources.ResourceConfigExportRequest):
     """导出资源站配置"""
     try:
         result = services_resources.export_config()

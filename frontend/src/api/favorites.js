@@ -6,8 +6,9 @@ import request from '@/utils/request'
  * @returns {Promise} 收藏列表
  */
 export function getFavorites({ page = 1, pageSize = 20 } = {}) {
-  return request.get('/api/v1/favorites', {
-    params: { page, page_size: pageSize }
+  return request.post('/api/v1/favorites/list', {
+    page,
+    page_size: pageSize
   })
 }
 
@@ -17,8 +18,9 @@ export function getFavorites({ page = 1, pageSize = 20 } = {}) {
  * @returns {Promise} 收藏状态
  */
 export function getFavoriteStatus({ siteId, vodId }) {
-  return request.get('/api/v1/favorites/status', {
-    params: { site_id: siteId, vod_id: vodId }
+  return request.post('/api/v1/favorites/status', {
+    site_id: siteId,
+    vod_id: vodId
   })
 }
 
@@ -28,7 +30,7 @@ export function getFavoriteStatus({ siteId, vodId }) {
  * @returns {Promise} 收藏结果
  */
 export function addFavorite({ siteId, vodId, title, thumbnail, typeName, remarks, keyword }) {
-  return request.post('/api/v1/favorites', {
+  return request.post('/api/v1/favorites/add', {
     site_id: siteId,
     vod_id: vodId,
     title,
@@ -45,5 +47,5 @@ export function addFavorite({ siteId, vodId, title, thumbnail, typeName, remarks
  * @returns {Promise} 取消结果
  */
 export function removeFavorite(favoriteId) {
-  return request.delete(`/api/v1/favorites/${favoriteId}`)
+  return request.post('/api/v1/favorites/remove', { favorite_id: favoriteId })
 }

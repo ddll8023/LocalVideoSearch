@@ -6,7 +6,7 @@ import request from '@/utils/request'
  * @returns {Promise} 搜索历史列表
  */
 export function getSearchHistory(limit = 10) {
-  return request.get('/api/v1/history', { params: { limit } })
+  return request.post('/api/v1/history/list', { limit })
 }
 
 /**
@@ -15,7 +15,7 @@ export function getSearchHistory(limit = 10) {
  * @returns {Promise} 记录结果
  */
 export function recordSearchHistory(keyword) {
-  return request.post('/api/v1/history', { keyword })
+  return request.post('/api/v1/history/record', { keyword })
 }
 
 /**
@@ -24,7 +24,7 @@ export function recordSearchHistory(keyword) {
  * @returns {Promise} 删除结果
  */
 export function deleteSearchHistory(historyId) {
-  return request.delete(`/api/v1/history/${historyId}`)
+  return request.post('/api/v1/history/delete', { history_id: historyId })
 }
 
 /**
@@ -32,5 +32,5 @@ export function deleteSearchHistory(historyId) {
  * @returns {Promise} 清空结果
  */
 export function clearSearchHistory() {
-  return request.delete('/api/v1/history')
+  return request.post('/api/v1/history/clear', {})
 }
