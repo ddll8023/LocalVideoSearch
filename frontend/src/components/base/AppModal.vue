@@ -3,12 +3,12 @@
     <Transition name="modal">
       <div
         v-if="modelValue"
-        class="fixed inset-0 z-[90] flex items-center justify-center bg-black/40 p-4"
+        class="fixed inset-0 z-[90] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
         @click.self="handleClose"
       >
         <div
           ref="dialogRef"
-          class="flex max-h-[85vh] w-full flex-col rounded-xl bg-white shadow-xl"
+          class="modal-panel flex max-h-[85vh] w-full flex-col rounded-xl border border-zinc-200 bg-panel shadow-lift"
           :class="maxWidth"
           role="dialog"
           aria-modal="true"
@@ -97,11 +97,23 @@ onBeforeUnmount(() => {
 <style scoped>
 .modal-enter-active,
 .modal-leave-active {
-  transition: opacity 0.2s ease;
+  transition: opacity 0.28s ease;
+}
+
+.modal-enter-active .modal-panel,
+.modal-leave-active .modal-panel {
+  transition: opacity 0.3s ease, transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), filter 0.3s ease;
 }
 
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+}
+
+.modal-enter-from .modal-panel,
+.modal-leave-to .modal-panel {
+  opacity: 0;
+  transform: translateY(16px) scale(0.97);
+  filter: blur(4px);
 }
 </style>

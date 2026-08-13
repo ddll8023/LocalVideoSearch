@@ -4,7 +4,7 @@
       <div
         v-for="toast in toastStore.toasts"
         :key="toast.id"
-        class="pointer-events-auto flex items-start gap-3 rounded-lg border bg-white px-4 py-3 shadow-lg"
+        class="toast-card pointer-events-auto flex items-start gap-3 rounded-lg border bg-panel/95 px-4 py-3 shadow-lift backdrop-blur"
         :class="typeClasses[toast.type] || typeClasses.info"
       >
         <font-awesome-icon
@@ -58,11 +58,13 @@ const typeIcons = {
 
 .toast-enter-from {
   opacity: 0;
-  transform: translateY(8px);
+  transform: translateY(12px) scale(0.96);
+  filter: blur(3px);
 }
 
 .toast-leave-to {
   opacity: 0;
-  transform: translateX(16px);
+  transform: translateX(20px) scale(0.98);
+  filter: blur(2px);
 }
 </style>

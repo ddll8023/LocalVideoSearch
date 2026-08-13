@@ -25,7 +25,7 @@
       </div>
     </header>
 
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="stagger-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <div v-for="item in statItems" :key="item.label" class="surface rounded-lg p-5">
         <div class="flex items-center justify-between gap-3">
           <p class="text-sm text-zinc-500">{{ item.label }}</p>
@@ -64,7 +64,7 @@
     <AppLoadingState v-if="loading && logs.length === 0" text="日志加载中" />
     <AppEmptyState v-else-if="logs.length === 0" title="暂无日志数据" description="当前筛选条件下没有匹配的日志。" />
 
-    <div v-else class="surface overflow-hidden rounded-lg">
+    <div v-else class="surface surface-reveal overflow-hidden rounded-lg">
       <button
         v-for="item in logs"
         :key="item.id || `${item.timestamp}-${item.message}`"

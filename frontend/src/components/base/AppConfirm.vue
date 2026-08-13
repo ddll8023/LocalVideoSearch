@@ -10,7 +10,7 @@
         <button
           type="button"
           class="inline-flex h-9 items-center justify-center gap-2 rounded-md px-4 text-sm font-medium text-white transition"
-          :class="danger ? 'bg-red-600 hover:bg-red-700' : 'bg-ink hover:bg-zinc-700'"
+          :class="danger ? 'bg-red-600 hover:bg-red-700' : 'bg-zinc-950 hover:bg-zinc-800'"
           :disabled="loading"
           @click="handleConfirm"
         >

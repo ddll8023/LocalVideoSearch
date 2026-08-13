@@ -53,7 +53,7 @@ const typeIconMap = {
 }
 
 const alertClasses = computed(() => [
-  'flex gap-3 rounded-lg border p-4 text-sm',
+  'alert-reveal flex gap-3 rounded-lg border p-4 text-sm shadow-line',
   typeClassMap[props.type]
 ])
 

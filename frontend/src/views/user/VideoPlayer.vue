@@ -1,6 +1,6 @@
 <template>
   <section class="grid gap-5 lg:grid-cols-[1fr_320px]">
-    <main class="surface overflow-hidden rounded-lg">
+    <main class="surface surface-reveal overflow-hidden rounded-lg">
       <div class="aspect-video bg-black">
         <div v-if="currentPlayUrl" ref="playerRef" class="h-full w-full" />
         <div v-else class="flex h-full items-center justify-center text-sm text-zinc-300">
@@ -28,7 +28,7 @@
       </div>
     </main>
 
-    <aside class="surface space-y-4 rounded-lg p-4">
+    <aside class="surface surface-reveal space-y-4 rounded-lg p-4" style="animation-delay: 100ms">
       <div v-if="videoStore.playSources.length > 1">
         <h2 class="mb-2 text-sm font-semibold text-zinc-900">播放线路</h2>
         <div class="flex flex-wrap gap-2">
@@ -39,7 +39,7 @@
             class="inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition"
             :class="source.name === activeLineName
               ? 'border-primary-500 bg-primary-50 text-primary-700'
-              : 'border-zinc-200 bg-white text-zinc-600 hover:border-primary-300'"
+              : 'border-zinc-200 bg-zinc-100/70 text-zinc-600 hover:border-primary-300'"
             @click="switchLine(source.name)"
           >
             <span>{{ source.name }}</span>
@@ -76,7 +76,7 @@
             class="w-full rounded-md border px-3 py-2 text-left text-sm transition"
             :class="index === currentEpisodeIndex
               ? 'border-primary-500 bg-primary-50 text-primary-700'
-              : 'border-zinc-200 bg-white text-zinc-700 hover:border-primary-300'"
+              : 'border-zinc-200 bg-zinc-100/70 text-zinc-700 hover:border-primary-300'"
             type="button"
             @click="switchEpisode(index)"
           >
@@ -273,7 +273,7 @@ const setupPlayer = async (url) => {
     pip: true,
     fullscreen: true,
     fullscreenWeb: true,
-    theme: '#2563eb',
+    theme: '#78959a',
     lang: 'zh-cn'
   })
 

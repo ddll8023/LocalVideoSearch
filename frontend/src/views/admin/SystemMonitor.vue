@@ -24,7 +24,7 @@
 
     <AppAlert v-if="error" :message="error" show-retry @retry="loadMonitorData" />
 
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div class="stagger-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <div v-for="item in summaryItems" :key="item.label" class="surface rounded-lg p-5">
         <div class="flex items-center justify-between gap-3">
           <p class="text-sm text-zinc-500">{{ item.label }}</p>
@@ -38,7 +38,7 @@
     <AppLoadingState v-if="loading && !hasLoaded" text="监控数据加载中" />
 
     <div v-else class="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-      <section class="surface rounded-lg p-5">
+      <section class="surface surface-reveal rounded-lg p-5">
         <div class="flex items-center justify-between gap-3">
           <h1 class="text-lg font-semibold text-zinc-900">搜索趋势</h1>
           <span class="text-xs text-zinc-500">每小时聚合</span>
@@ -47,7 +47,7 @@
         <AppEmptyState v-if="!trendItems.length" title="暂无趋势数据" description="产生请求日志后会显示搜索趋势。" :framed="false" />
       </section>
 
-      <section class="surface rounded-lg p-5">
+      <section class="surface surface-reveal rounded-lg p-5" style="animation-delay: 80ms">
         <h1 class="text-lg font-semibold text-zinc-900">系统健康</h1>
         <div class="mt-5 space-y-4">
           <div class="flex items-center justify-between rounded-md border border-zinc-100 bg-zinc-50 p-4">
@@ -68,7 +68,7 @@
         </div>
       </section>
 
-      <section class="surface rounded-lg p-5">
+      <section class="surface surface-reveal rounded-lg p-5" style="animation-delay: 160ms">
         <div class="flex items-center justify-between gap-3">
           <h1 class="text-lg font-semibold text-zinc-900">站点性能</h1>
           <span class="text-xs text-zinc-500">按请求数排序</span>
@@ -90,7 +90,7 @@
         <AppEmptyState v-else title="暂无站点数据" description="完成资源站请求后会显示性能统计。" :framed="false" />
       </section>
 
-      <section class="surface rounded-lg p-5">
+      <section class="surface surface-reveal rounded-lg p-5" style="animation-delay: 240ms">
         <h1 class="text-lg font-semibold text-zinc-900">热门关键词</h1>
         <div v-show="keywordItems.length" ref="keywordChartRef" class="mt-5 h-80 w-full" />
         <AppEmptyState v-if="!keywordItems.length" title="暂无关键词数据" description="搜索请求日志中包含关键词后会显示排名。" :framed="false" />
@@ -300,7 +300,7 @@ const updateTrendChart = async () => {
         type: 'bar',
         data: trendItems.value.map((item) => item.search_count),
         barMaxWidth: 28,
-        itemStyle: { color: '#0f766e', borderRadius: [4, 4, 0, 0] }
+        itemStyle: { color: '#78959a', borderRadius: [4, 4, 0, 0] }
       }
     ]
   })
@@ -346,7 +346,7 @@ const updateKeywordChart = async () => {
         type: 'bar',
         data: items.map((item) => item.count),
         barMaxWidth: 16,
-        itemStyle: { color: '#f59e0b', borderRadius: [0, 4, 4, 0] }
+        itemStyle: { color: '#9c8a66', borderRadius: [0, 4, 4, 0] }
       }
     ]
   })

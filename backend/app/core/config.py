@@ -30,6 +30,8 @@ class Settings(BaseSettings):
     APP_DATA_DIR: Path = _default_app_data_dir()
     DEFAULT_PAGE_SIZE: int = 20
     MAX_PAGE_SIZE: int = 100
+    SEARCH_CACHE_TTL_SECONDS: int = 3 * 24 * 60 * 60
+    SEARCH_CACHE_MAX_ENTRIES: int = 128
     CONNECTION_TEST_KEYWORD: str = "喜羊羊"
     CONNECTION_TEST_CONCURRENCY: int = 5
     CONNECTION_MIN_RESPONSE_SIZE: int = 100

@@ -1,6 +1,10 @@
 <template>
   <section class="space-y-6">
-    <header class="surface rounded-lg p-5">
+    <header class="surface surface-reveal cinema-scan relative z-30 overflow-visible rounded-lg p-5" :class="{ 'is-active': searchStore.loading }">
+      <div class="mb-4 flex items-center justify-between gap-3 text-[10px] uppercase tracking-[0.24em] text-zinc-400">
+        <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 animate-signal-pulse rounded-full bg-primary-500" />Signal ready</span>
+        <span>Local search / 01</span>
+      </div>
       <form class="flex flex-col gap-3 sm:flex-row" @submit.prevent="handleSearch">
         <label class="sr-only" for="keyword">关键词</label>
         <div class="relative flex-1">
@@ -17,13 +21,13 @@
 
           <div
             v-if="showHistory && historyList.length > 0"
-            class="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-md border border-zinc-200 bg-white shadow-lg"
+            class="absolute left-0 right-0 top-full z-[60] mt-1 overflow-hidden rounded-md border border-zinc-200 bg-panel/95 shadow-lift backdrop-blur-xl"
           >
             <button
               v-for="item in historyList"
               :key="item.id"
               type="button"
-              class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-zinc-50"
+              class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-zinc-700 transition hover:bg-zinc-100/80"
               @mousedown.prevent
               @click="applyHistory(item)"
             >
@@ -64,7 +68,7 @@
       </form>
     </header>
 
-    <section v-if="playRecords.length > 0" class="surface rounded-lg p-4">
+    <section v-if="playRecords.length > 0" class="surface surface-reveal rounded-lg p-4" style="animation-delay: 90ms">
       <div class="mb-3 flex items-center justify-between gap-3">
         <div class="flex items-center gap-2">
           <font-awesome-icon :icon="['fas', 'play']" class="text-primary-700" aria-hidden="true" />
@@ -120,15 +124,17 @@
 
     <div
       v-if="searchStore.searchingCount > 0"
-      class="flex items-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-4 py-2.5 text-sm text-primary-700"
+      class="cinema-scan is-active flex items-center gap-2 rounded-lg border border-primary-100 bg-primary-50 px-4 py-2.5 text-sm text-primary-700"
+      role="status"
+      aria-live="polite"
     >
       <font-awesome-icon :icon="['fas', 'spinner']" class="fa-spin" aria-hidden="true" />
       <span>正在搜索 {{ searchStore.searchingCount }} / {{ siteTabs.length }} 个资源站…</span>
     </div>
 
-    <section v-if="siteTabs.length > 0" class="surface overflow-hidden rounded-lg">
-      <div class="flex">
-        <aside class="w-48 shrink-0 space-y-1 overflow-y-auto border-r border-zinc-200 p-3">
+    <section v-if="siteTabs.length > 0" class="search-workspace" style="animation-delay: 150ms">
+      <div class="flex items-start gap-4">
+        <aside class="site-sidebar surface w-48 shrink-0 space-y-1 overflow-y-auto rounded-lg p-3">
           <button
             v-for="tab in siteTabs"
             :key="tab.siteId"
@@ -158,7 +164,7 @@
           </button>
         </aside>
 
-        <div class="min-w-0 flex-1">
+        <div class="site-content surface min-w-0 flex-1 overflow-hidden rounded-lg">
           <transition name="tab-fade" mode="out-in">
             <div v-if="activeResult" :key="searchStore.activeSiteId" class="space-y-4 p-4">
               <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -174,16 +180,20 @@
                 </div>
               </div>
 
-              <div v-if="activeResult.lists.length > 0" class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <TransitionGroup
+                v-if="activeResult.lists.length > 0"
+                name="result-grid"
+                tag="div"
+                class="stagger-grid relative grid gap-2 sm:grid-cols-2 lg:grid-cols-4"
+              >
                 <VideoResultCard
                   v-for="(video, index) in activeResult.lists"
                   :key="video.id"
                   :video="video"
                   :to="buildDetailLink(video)"
-                  class="animate-fade-up"
                   :style="{ animationDelay: `${Math.min(index * 40, 400)}ms` }"
                 />
-              </div>
+              </TransitionGroup>
 
               <AppEmptyState
                 v-else

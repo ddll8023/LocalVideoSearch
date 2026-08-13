@@ -1,13 +1,20 @@
 <template>
-  <div class="app-shell">
-    <header class="app-titlebar sticky top-0 z-20 border-b border-zinc-200 bg-canvas/95 backdrop-blur">
+  <div class="app-shell relative overflow-x-clip">
+    <div class="ambient-orb -left-32 top-32" aria-hidden="true" />
+    <div class="ambient-orb -right-40 top-[42rem] opacity-20" aria-hidden="true" />
+
+    <header class="app-titlebar sticky top-0 z-20 border-b border-zinc-200/80 bg-canvas/80 backdrop-blur-xl">
       <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <RouterLink to="/" class="flex items-center gap-3 text-ink">
-          <span class="flex h-9 w-9 items-center justify-center rounded-md bg-ink text-white">
-            <font-awesome-icon :icon="['fas', 'video']" aria-hidden="true" />
+        <RouterLink to="/" class="group flex items-center gap-3 text-ink">
+          <span class="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-md bg-zinc-950 text-white shadow-lg transition duration-300 group-hover:rotate-[-4deg] group-hover:scale-105">
+            <span class="absolute inset-0 bg-gradient-to-br from-primary-500/40 to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
+            <font-awesome-icon class="relative" :icon="['fas', 'video']" aria-hidden="true" />
           </span>
-          <span class="text-base font-semibold">VideoSearch</span>
-          <span class="text-xs text-zinc-400">v0.1.0</span>
+          <span>
+            <span class="block text-base font-semibold tracking-wide">VideoSearch</span>
+            <span class="block text-[9px] uppercase tracking-[0.28em] text-zinc-400">Local cinema index</span>
+          </span>
+          <span class="hidden text-xs text-zinc-400 sm:inline">v0.1.0</span>
         </RouterLink>
 
         <div class="flex items-center">
@@ -15,6 +22,7 @@
             <RouterLink v-for="item in navItems" :key="item.name" :to="item.to" :class="itemClass(item.to)">
               <font-awesome-icon :icon="item.icon" aria-hidden="true" />
               <span class="hidden sm:inline">{{ item.name }}</span>
+              <span class="nav-marker" aria-hidden="true" />
             </RouterLink>
           </nav>
 
@@ -33,7 +41,7 @@
       </div>
     </header>
 
-    <main class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <main class="relative mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
       <RouterView v-slot="{ Component }">
         <transition name="page" mode="out-in">
           <component :is="Component" />
@@ -69,10 +77,10 @@ const navItems = [
 const currentPath = computed(() => route.path)
 
 const itemClass = (to) => [
-  'inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition',
+  'relative inline-flex h-10 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition',
   currentPath.value === to
-    ? 'bg-ink text-white'
-    : 'text-zinc-600 hover:bg-white hover:text-primary-700'
+    ? 'bg-zinc-950 text-white shadow-lg'
+    : 'text-zinc-600 hover:bg-zinc-100/80 hover:text-primary-700'
 ]
 
 const isDesktop = computed(() => !!window.desktopApi)
@@ -103,13 +111,37 @@ onMounted(() => {
   -webkit-app-region: no-drag;
 }
 
-.page-enter-active,
-.page-leave-active {
-  transition: opacity 0.2s ease;
+.nav-marker {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.25rem;
+  left: 0.75rem;
+  height: 1px;
+  opacity: 0;
+  transform: scaleX(0.35);
+  background: #78959a;
+  transition: opacity 260ms ease, transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.page-enter-from,
+.router-link-active .nav-marker {
+  opacity: 0.9;
+  transform: scaleX(1);
+}
+
+.page-enter-active,
+.page-leave-active {
+  transition: opacity 0.38s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), filter 0.38s ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.995);
+  filter: blur(4px);
+}
+
 .page-leave-to {
   opacity: 0;
+  transform: translateY(-8px);
+  filter: blur(3px);
 }
 </style>

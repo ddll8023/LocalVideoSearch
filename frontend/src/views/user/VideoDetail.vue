@@ -9,7 +9,7 @@
 
     <AppAlert v-if="videoStore.error" :message="videoStore.error" show-retry @retry="loadDetail" />
 
-    <section v-if="videoStore.currentVideo" class="surface grid gap-6 rounded-lg p-5 lg:grid-cols-[260px_1fr]">
+    <section v-if="videoStore.currentVideo" class="surface surface-reveal grid gap-6 rounded-lg p-5 lg:grid-cols-[260px_1fr]">
       <div class="aspect-[3/4] overflow-hidden rounded-md bg-zinc-100">
         <img
           v-if="videoStore.currentVideo.thumbnail && !posterFailed"
@@ -34,7 +34,7 @@
               class="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border px-3 text-sm font-medium transition"
               :class="favorited
                 ? 'border-red-200 bg-red-50 text-red-600 hover:bg-red-100'
-                : 'border-zinc-200 bg-white text-zinc-600 hover:border-red-300 hover:text-red-500'"
+                : 'border-zinc-200 bg-zinc-100/70 text-zinc-600 hover:border-red-300 hover:text-red-500'"
               :disabled="favoriteLoading"
               @click="toggleFavorite"
             >
@@ -58,7 +58,7 @@
       </div>
     </section>
 
-    <section v-if="videoStore.currentVideo" class="surface rounded-lg p-5">
+    <section v-if="videoStore.currentVideo" class="surface surface-reveal rounded-lg p-5" style="animation-delay: 100ms">
       <div class="mb-4 flex items-center gap-2">
         <font-awesome-icon :icon="['fas', 'layer-group']" class="text-primary-700" aria-hidden="true" />
         <h2 class="text-base font-semibold text-zinc-900">播放源</h2>

@@ -16,8 +16,6 @@ from app.utils.exception import ServiceException
 
 logger = logging.getLogger(__name__)
 
-SEARCH_CACHE_TTL_SECONDS = 600
-SEARCH_CACHE_MAX_ENTRIES = 128
 _search_cache: dict[tuple, tuple[float, object]] = {}
 
 
@@ -29,6 +27,15 @@ async def query_video_list(query: schemas_videos.VideoSearchRequest):
             raise ServiceException(ErrorCode.PARAM_ERROR, "搜索关键词不能为空")
 
         site = services_resources.validate_enabled_site(query.site_id)
+        cache_key = (
+            site.site_id,
+            _normalize_keyword(wd),
+            query.page,
+            query.page_size,
+        )
+        cached_result = _get_cached_search(cache_key)
+        if cached_result is not None:
+            return cached_result
 
         client = http_client.get_shared_client()
         site_result = await fetch_site_raw(client, site, wd, query.page)
@@ -85,7 +92,7 @@ async def query_video_list(query: schemas_videos.VideoSearchRequest):
             ),
             elapsed_ms=site_result.get("elapsed_ms", 0),
         )
-        _set_cached_search((site.site_id, wd, query.page), result)
+        _set_cached_search(cache_key, result)
         return result
     except ServiceException:
         raise
@@ -108,7 +115,16 @@ async def query_video_detail(query: schemas_videos.VideoDetailRequest):
         if not keyword or not vod_id:
             raise ServiceException(ErrorCode.PARAM_ERROR, "参数错误")
 
-        search_result = _get_cached_search((query.site_id, keyword, query.page))
+        # 即使命中缓存，详情查询仍需校验资源站当前可用状态。
+        services_resources.validate_enabled_site(query.site_id)
+        search_result = _get_cached_search(
+            (
+                query.site_id,
+                _normalize_keyword(keyword),
+                query.page,
+                settings.DEFAULT_PAGE_SIZE,
+            )
+        )
         if search_result is None:
             search_query = schemas_videos.VideoSearchRequest(
                 wd=keyword,
@@ -167,13 +183,14 @@ async def fetch_site_raw(
 
 
 def _get_cached_search(cache_key: tuple):
-    """读取未过期的搜索结果缓存"""
+    """读取未过期的搜索结果缓存，并惰性清理已过期条目"""
+    _purge_expired_search_cache()
     entry = _search_cache.get(cache_key)
     if not entry:
         return None
 
     cached_at, value = entry
-    if time.time() - cached_at > SEARCH_CACHE_TTL_SECONDS:
+    if time.time() - cached_at > settings.SEARCH_CACHE_TTL_SECONDS:
         _search_cache.pop(cache_key, None)
         return None
     return value
@@ -181,7 +198,27 @@ def _get_cached_search(cache_key: tuple):
 
 def _set_cached_search(cache_key: tuple, value):
     """写入搜索结果缓存，超容量时淘汰最旧条目"""
-    if len(_search_cache) >= SEARCH_CACHE_MAX_ENTRIES:
+    _purge_expired_search_cache()
+    if settings.SEARCH_CACHE_MAX_ENTRIES <= 0:
+        return
+    if len(_search_cache) >= settings.SEARCH_CACHE_MAX_ENTRIES:
         oldest_key = min(_search_cache, key=lambda key: _search_cache[key][0])
         _search_cache.pop(oldest_key, None)
     _search_cache[cache_key] = (time.time(), value)
+
+
+def _purge_expired_search_cache():
+    """清理超过 TTL 的搜索缓存条目"""
+    now = time.time()
+    expired_keys = [
+        key
+        for key, (cached_at, _) in _search_cache.items()
+        if now - cached_at > settings.SEARCH_CACHE_TTL_SECONDS
+    ]
+    for key in expired_keys:
+        _search_cache.pop(key, None)
+
+
+def _normalize_keyword(keyword: str) -> str:
+    """生成用于缓存的规范化关键词"""
+    return keyword.strip().casefold()

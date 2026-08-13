@@ -58,7 +58,7 @@
       </div>
     </header>
 
-    <section class="grid gap-3 sm:grid-cols-3">
+    <section class="stagger-grid grid gap-3 sm:grid-cols-3">
       <div v-for="item in statItems" :key="item.label" class="surface rounded-lg p-4">
         <p class="text-sm text-zinc-500">{{ item.label }}</p>
         <p class="mt-2 text-2xl font-semibold text-zinc-900">{{ item.value }}</p>
@@ -83,7 +83,7 @@
           <input
             v-model.trim="filterKeyword"
             type="text"
-            class="h-9 w-full rounded-md border border-zinc-300 bg-white pl-9 pr-3 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+            class="h-9 w-full rounded-md border border-zinc-300 bg-zinc-100/75 pl-9 pr-3 text-sm text-zinc-900 outline-none transition placeholder:text-zinc-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
             placeholder="按名称过滤站点"
           />
         </div>
@@ -121,7 +121,7 @@
       <article
         v-for="site in filteredSites"
         :key="site.site_id"
-        class="grid grid-cols-[1fr_auto] items-center gap-3 border-b border-zinc-100 px-4 py-4 last:border-b-0 md:grid-cols-[1fr_96px_180px_220px]"
+        class="resource-row grid grid-cols-[1fr_auto] items-center gap-3 border-b border-zinc-100 px-4 py-4 last:border-b-0 md:grid-cols-[1fr_96px_180px_220px]"
       >
         <div class="min-w-0">
           <h2 class="truncate text-sm font-semibold text-zinc-900">{{ site.name }}</h2>

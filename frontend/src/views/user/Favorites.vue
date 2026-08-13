@@ -13,16 +13,16 @@
     <AppLoadingState v-if="loading && favorites.length === 0" text="正在加载收藏" />
 
     <section v-if="favorites.length > 0" class="surface space-y-4 rounded-lg p-4">
-      <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="stagger-grid grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
         <div v-for="favorite in favorites" :key="favorite.id" class="group relative">
           <RouterLink
-            class="block overflow-hidden rounded-md border border-zinc-200 bg-white transition duration-200 hover:border-primary-500 hover:shadow-lift hover:-translate-y-0.5"
+            class="group block overflow-hidden rounded-md border border-zinc-200 bg-zinc-100/70 transition duration-300 hover:-translate-y-1 hover:border-primary-500 hover:shadow-glow"
             :to="buildDetailLink(favorite)"
           >
             <div class="aspect-[4/5] bg-zinc-100">
               <img
                 v-if="favorite.thumbnail && !failedImages[favorite.id]"
-                class="h-full w-full object-cover"
+                class="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-105"
                 :src="favorite.thumbnail"
                 :alt="favorite.title"
                 loading="lazy"

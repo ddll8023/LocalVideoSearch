@@ -6,12 +6,83 @@ import { searchVideos } from '@/api/videos'
 import { useResourceStore } from '@/stores/resources'
 
 const CACHE_KEY = 'videosearch.search.state'
-const CACHE_VERSION = 2
-const CACHE_EXPIRE_MS = 2 * 60 * 60 * 1000
+const CACHE_VERSION = 3
+const CACHE_EXPIRE_MS = 3 * 24 * 60 * 60 * 1000
+const MAX_CACHED_RESULTS = 32
 const DEFAULT_PAGE_SIZE = 20
 
 const isCanceledError = (err) =>
   err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError'
+
+const normalizeKeyword = (value) => String(value || '').trim().toLocaleLowerCase()
+
+const buildCacheKey = ({ keyword, siteId, page, pageSize }) =>
+  JSON.stringify([normalizeKeyword(keyword), String(siteId), Number(page), Number(pageSize)])
+
+const isCacheFresh = (savedAt) => {
+  const timestamp = Number(savedAt)
+  return Number.isFinite(timestamp) && Date.now() - timestamp <= CACHE_EXPIRE_MS
+}
+
+const removePersistentCache = () => {
+  try {
+    localStorage.removeItem(CACHE_KEY)
+  } catch {
+    // 缓存不可用时不影响搜索主流程。
+  }
+}
+
+const readPersistentCache = () => {
+  try {
+    const rawCache = localStorage.getItem(CACHE_KEY)
+    if (!rawCache) return { version: CACHE_VERSION, entries: [], recent_state: null }
+
+    const cache = JSON.parse(rawCache)
+    if (cache.version !== CACHE_VERSION) {
+      removePersistentCache()
+      return { version: CACHE_VERSION, entries: [], recent_state: null }
+    }
+
+    const rawEntries = Array.isArray(cache.entries) ? cache.entries : []
+    const entries = rawEntries.filter(
+      (entry) =>
+        entry?.key &&
+        entry?.result &&
+        isCacheFresh(entry.saved_at)
+    )
+    const recentState =
+      cache.recent_state && isCacheFresh(cache.recent_state.saved_at)
+        ? cache.recent_state
+        : null
+
+    if (entries.length !== rawEntries.length || (cache.recent_state && !recentState)) {
+      writePersistentCache({
+        ...cache,
+        version: CACHE_VERSION,
+        entries,
+        recent_state: recentState
+      })
+    }
+
+    return {
+      version: CACHE_VERSION,
+      entries,
+      recent_state: recentState
+    }
+  } catch {
+    removePersistentCache()
+    return { version: CACHE_VERSION, entries: [], recent_state: null }
+  }
+}
+
+function writePersistentCache(cache) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify(cache))
+  } catch {
+    // localStorage 空间不足或被禁用时放弃缓存，不影响页面功能。
+    removePersistentCache()
+  }
+}
 
 export const useSearchStore = defineStore('search', () => {
   const keyword = ref('')
@@ -44,64 +115,109 @@ export const useSearchStore = defineStore('search', () => {
   }
 
   const restoreCache = () => {
-    const rawCache = localStorage.getItem(CACHE_KEY)
-    if (!rawCache) return
+    const cache = readPersistentCache()
+    const recentState = cache.recent_state
+    if (!recentState) return
 
-    try {
-      const cache = JSON.parse(rawCache)
-      if (cache.version !== CACHE_VERSION || Date.now() - cache.saved_at > CACHE_EXPIRE_MS) {
-        localStorage.removeItem(CACHE_KEY)
-        return
-      }
-
-      keyword.value = cache.keyword || ''
-      activeSiteId.value = cache.active_site_id || ''
-      resultMap.value = cache.result_map || {}
-      failureMap.value = cache.failure_map || {}
-      hasSearched.value = Boolean(cache.has_searched || Object.keys(resultMap.value).length)
-
-      // 恢复时按结果重建站点状态
-      const restoredStatus = {}
-      Object.keys(resultMap.value).forEach((siteId) => {
-        restoredStatus[siteId] = 'success'
+    keyword.value = recentState.keyword || ''
+    const validKeys = new Set(cache.entries.map((entry) => entry.key))
+    const cachedResultMap =
+      recentState.result_map && typeof recentState.result_map === 'object'
+        ? recentState.result_map
+        : {}
+    resultMap.value = Object.fromEntries(
+      Object.entries(cachedResultMap).filter(([siteId, result]) => {
+        const page = Number(result?.pagination?.page || 1)
+        const pageSize = Number(result?.pagination?.page_size || DEFAULT_PAGE_SIZE)
+        return validKeys.has(
+          buildCacheKey({
+            keyword: recentState.keyword,
+            siteId,
+            page,
+            pageSize
+          })
+        )
       })
-      Object.keys(failureMap.value).forEach((siteId) => {
-        restoredStatus[siteId] = 'failed'
-      })
-      statusMap.value = restoredStatus
-    } catch {
-      localStorage.removeItem(CACHE_KEY)
-    }
+    )
+    activeSiteId.value = resultMap.value[recentState.active_site_id]
+      ? recentState.active_site_id
+      : Object.keys(resultMap.value)[0] || ''
+    // 失败响应不进入缓存，恢复时只重建成功状态。
+    failureMap.value = {}
+    hasSearched.value = Boolean(
+      recentState.has_searched || Object.keys(resultMap.value).length
+    )
+
+    const restoredStatus = {}
+    Object.keys(resultMap.value).forEach((siteId) => {
+      restoredStatus[siteId] = 'success'
+    })
+    statusMap.value = restoredStatus
   }
 
   const saveCache = () => {
-    try {
-      localStorage.setItem(
-        CACHE_KEY,
-        JSON.stringify({
-          version: CACHE_VERSION,
-          keyword: keyword.value,
-          active_site_id: activeSiteId.value,
-          result_map: resultMap.value,
-          failure_map: failureMap.value,
-          has_searched: hasSearched.value,
-          saved_at: Date.now()
-        })
-      )
-    } catch {
-      // localStorage 空间不足时放弃本次缓存，不影响页面功能
-      localStorage.removeItem(CACHE_KEY)
-    }
+    const cache = readPersistentCache()
+    const now = Date.now()
+    let entries = cache.entries
+
+    Object.entries(resultMap.value).forEach(([siteId, result]) => {
+      const page = Number(result?.pagination?.page || 1)
+      const pageSize = Number(result?.pagination?.page_size || DEFAULT_PAGE_SIZE)
+      const key = buildCacheKey({
+        keyword: keyword.value,
+        siteId,
+        page,
+        pageSize
+      })
+      const existingEntry = entries.find((entry) => entry.key === key)
+      entries = [
+        {
+          key,
+          result,
+          saved_at: existingEntry?.saved_at || now
+        },
+        ...entries.filter((entry) => entry.key !== key)
+      ].slice(0, MAX_CACHED_RESULTS)
+    })
+
+    writePersistentCache({
+      version: CACHE_VERSION,
+      entries,
+      recent_state: {
+        keyword: keyword.value,
+        active_site_id: activeSiteId.value,
+        result_map: resultMap.value,
+        has_searched: hasSearched.value,
+        saved_at: now
+      }
+    })
+  }
+
+  const getCachedSiteResult = ({ wd, siteId, page, pageSize }) => {
+    const key = buildCacheKey({
+      keyword: wd,
+      siteId,
+      page,
+      pageSize
+    })
+    const cache = readPersistentCache()
+    const entry = cache.entries.find((item) => item.key === key)
+    if (!entry) return null
+
+    const site = useResourceStore().sites.find((item) => item.site_id === siteId)
+    return site ? buildCachedSiteResult(site, entry.result) : entry.result
   }
 
   const clearResults = () => {
     abortController?.abort()
+    searchSeq++
+    loading.value = false
     resultMap.value = {}
     failureMap.value = {}
     statusMap.value = {}
     activeSiteId.value = ''
     hasSearched.value = false
-    localStorage.removeItem(CACHE_KEY)
+    removePersistentCache()
   }
 
   const searchAcrossSites = async ({ page = 1, pageSize = DEFAULT_PAGE_SIZE } = {}) => {
@@ -138,15 +254,8 @@ export const useSearchStore = defineStore('search', () => {
       }
 
       const sites = resourceStore.enabledSites
-
-      const initialStatus = {}
-      sites.forEach((site) => {
-        initialStatus[site.site_id] = 'loading'
-      })
-      statusMap.value = initialStatus
-
-      // 记录搜索历史，失败不影响搜索流程
-      recordSearchHistory(wd).catch(() => {})
+      // 默认展示配置顺序中的第一个资源站，不受各站请求完成顺序影响
+      activeSiteId.value = sites[0].site_id
 
       const queue = []
       let wakeResolve = null
@@ -156,13 +265,48 @@ export const useSearchStore = defineStore('search', () => {
           wakeResolve = null
         }
       }
-      const waitWake = () => new Promise((r) => { wakeResolve = r })
-      const push = (item) => { queue.push(item); wake() }
+      const waitWake = () => new Promise((resolve) => { wakeResolve = resolve })
+      const push = (item) => {
+        queue.push(item)
+        wake()
+      }
+
+      const cachedResults = new Map()
+      const initialStatus = {}
+      sites.forEach((site) => {
+        const cachedResult = getCachedSiteResult({
+          wd,
+          siteId: site.site_id,
+          page,
+          pageSize
+        })
+        if (cachedResult) {
+          cachedResults.set(site.site_id, cachedResult)
+          initialStatus[site.site_id] = 'success'
+        } else {
+          initialStatus[site.site_id] = 'loading'
+        }
+      })
+      statusMap.value = initialStatus
+
+      // 记录搜索历史，失败不影响搜索流程
+      recordSearchHistory(wd).catch(() => {})
 
       let settled = 0
       const total = sites.length
+      const settle = () => {
+        settled++
+        if (settled === total) push(null)
+      }
 
       sites.forEach((site) => {
+        const cachedResult = cachedResults.get(site.site_id)
+        if (cachedResult) {
+          push({ ok: true, site, result: cachedResult, cached: true })
+          settle()
+          return
+        }
+
         searchVideos({ wd, siteId: site.site_id, page, pageSize, signal })
           .then((response) => {
             push({ ok: true, site, data: response.data })
@@ -174,10 +318,7 @@ export const useSearchStore = defineStore('search', () => {
               push({ ok: false, site, message: err?.message || '搜索失败' })
             }
           })
-          .finally(() => {
-            settled++
-            if (settled === total) push(null)
-          })
+          .finally(settle)
       })
 
       while (true) {
@@ -192,14 +333,14 @@ export const useSearchStore = defineStore('search', () => {
         }
 
         if (item.ok) {
+          const result = item.cached
+            ? item.result
+            : buildSiteResult(item.site, item.data, page, pageSize)
           resultMap.value = {
             ...resultMap.value,
-            [item.site.site_id]: buildSiteResult(item.site, item.data, page, pageSize)
+            [item.site.site_id]: result
           }
           statusMap.value = { ...statusMap.value, [item.site.site_id]: 'success' }
-          if (!activeSiteId.value) {
-            activeSiteId.value = item.site.site_id
-          }
         } else {
           failureMap.value = {
             ...failureMap.value,
@@ -210,9 +351,6 @@ export const useSearchStore = defineStore('search', () => {
         await nextTick()
       }
 
-      if (!activeSiteId.value) {
-        activeSiteId.value = Object.keys(resultMap.value)[0] || ''
-      }
       saveCache()
     } catch (searchError) {
       if (isCanceledError(searchError)) return
@@ -243,16 +381,16 @@ export const useSearchStore = defineStore('search', () => {
         return
       }
 
-      const response = await searchVideos({
-        wd,
-        siteId,
-        page,
-        pageSize
-      })
+      const cachedResult = getCachedSiteResult({ wd, siteId, page, pageSize })
+      let result = cachedResult
+      if (!result) {
+        const response = await searchVideos({ wd, siteId, page, pageSize })
+        result = buildSiteResult(site, response.data, page, pageSize)
+      }
 
       resultMap.value = {
         ...resultMap.value,
-        [siteId]: buildSiteResult(site, response.data, page, pageSize)
+        [siteId]: result
       }
       const nextFailureMap = { ...failureMap.value }
       delete nextFailureMap[siteId]
@@ -279,16 +417,18 @@ export const useSearchStore = defineStore('search', () => {
 
     statusMap.value = { ...statusMap.value, [siteId]: 'loading' }
     try {
-      const response = await searchVideos({
-        wd,
-        siteId,
-        page: 1,
-        pageSize: DEFAULT_PAGE_SIZE
-      })
+      const page = 1
+      const pageSize = DEFAULT_PAGE_SIZE
+      const cachedResult = getCachedSiteResult({ wd, siteId, page, pageSize })
+      let result = cachedResult
+      if (!result) {
+        const response = await searchVideos({ wd, siteId, page, pageSize })
+        result = buildSiteResult(site, response.data, page, pageSize)
+      }
 
       resultMap.value = {
         ...resultMap.value,
-        [siteId]: buildSiteResult(site, response.data, 1, DEFAULT_PAGE_SIZE)
+        [siteId]: result
       }
       const nextFailureMap = { ...failureMap.value }
       delete nextFailureMap[siteId]
@@ -349,5 +489,12 @@ function buildSiteResult(site, payload, page, pageSize) {
     },
     filterStats: payload?.filter_stats || null,
     elapsedMs: payload?.elapsed_ms || 0
+  }
+}
+
+function buildCachedSiteResult(site, result) {
+  return {
+    ...result,
+    site: { ...site }
   }
 }

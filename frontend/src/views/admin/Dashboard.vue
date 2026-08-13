@@ -1,12 +1,12 @@
 <template>
-  <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+  <section class="stagger-grid grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
     <RouterLink
       v-for="item in entries"
       :key="item.name"
-      class="surface rounded-lg p-5 transition hover:border-primary-500 hover:shadow-lift"
+      class="surface group rounded-lg p-5 transition duration-300 hover:-translate-y-1 hover:border-primary-500 hover:shadow-glow"
       :to="item.to"
     >
-      <font-awesome-icon :icon="item.icon" class="text-xl text-primary-700" aria-hidden="true" />
+      <font-awesome-icon :icon="item.icon" class="text-xl text-primary-700 transition duration-500 group-hover:rotate-[-8deg] group-hover:scale-110" aria-hidden="true" />
       <h1 class="mt-4 text-lg font-semibold text-zinc-900">{{ item.name }}</h1>
       <p class="mt-2 text-sm leading-6 text-zinc-500">{{ item.summary }}</p>
     </RouterLink>
