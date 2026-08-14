@@ -6,11 +6,13 @@
         <p class="mt-1 text-sm text-zinc-500">实时摘要和关键运行指标。</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <select v-model.number="hours" class="field-input w-32" @change="loadMonitorData">
-          <option :value="6">6 小时</option>
-          <option :value="24">24 小时</option>
-          <option :value="72">72 小时</option>
-        </select>
+        <AppSelect
+          v-model="hours"
+          :options="monitorRangeOptions"
+          class="w-32"
+          aria-label="监控时间范围"
+          @change="loadMonitorData"
+        />
         <button class="toolbar-button" type="button" @click="toggleAutoRefresh">
           <font-awesome-icon :icon="['fas', autoRefreshPaused ? 'play' : 'pause']" aria-hidden="true" />
           <span>{{ autoRefreshPaused ? '恢复刷新' : '暂停刷新' }}</span>
@@ -125,6 +127,7 @@ import {
 import AppAlert from '@/components/base/AppAlert.vue'
 import AppEmptyState from '@/components/base/AppEmptyState.vue'
 import AppLoadingState from '@/components/base/AppLoadingState.vue'
+import AppSelect from '@/components/base/AppSelect.vue'
 
 echarts.use([BarChart, GridComponent, TooltipComponent, CanvasRenderer])
 
@@ -147,6 +150,12 @@ const keywordChartRef = ref(null)
 let refreshTimer = null
 let trendChart = null
 let keywordChart = null
+
+const monitorRangeOptions = [
+  { value: 6, label: '6 小时' },
+  { value: 24, label: '24 小时' },
+  { value: 72, label: '72 小时' }
+]
 
 const summaryItems = computed(() => [
   {

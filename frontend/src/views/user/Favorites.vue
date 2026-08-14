@@ -12,28 +12,29 @@
 
     <AppLoadingState v-if="loading && favorites.length === 0" text="正在加载收藏" />
 
-    <section v-if="favorites.length > 0" class="surface space-y-4 rounded-lg p-4">
-      <div class="stagger-grid grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <div v-for="favorite in favorites" :key="favorite.id" class="group relative">
+    <section v-if="favorites.length > 0" class="surface space-y-4 rounded-lg p-3 sm:p-4">
+      <div class="stagger-grid grid grid-cols-2 gap-3 min-[480px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
+        <div v-for="favorite in favorites" :key="favorite.id" class="group relative min-w-0">
           <RouterLink
-            class="group block overflow-hidden rounded-md border border-zinc-200 bg-zinc-100/70 transition duration-300 hover:-translate-y-1 hover:border-primary-500 hover:shadow-glow"
+            class="block overflow-hidden rounded-md border border-zinc-200 bg-panel/90 shadow-line transition duration-300 hover:-translate-y-1 hover:border-primary-500 hover:shadow-glow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             :to="buildDetailLink(favorite)"
           >
-            <div class="aspect-[4/5] bg-zinc-100">
+            <div class="relative aspect-[2/3] overflow-hidden bg-zinc-100">
               <img
                 v-if="favorite.thumbnail && !failedImages[favorite.id]"
-                class="h-full w-full object-cover transition duration-700 ease-out group-hover:scale-105"
+                class="h-full w-full object-cover transition duration-500 ease-out group-hover:scale-105"
                 :src="favorite.thumbnail"
                 :alt="favorite.title"
                 loading="lazy"
                 @error="failedImages[favorite.id] = true"
               />
               <div v-else class="flex h-full items-center justify-center text-zinc-300">
-                <font-awesome-icon :icon="['fas', 'film']" class="text-3xl" aria-hidden="true" />
+                <font-awesome-icon :icon="['fas', 'film']" class="text-2xl" aria-hidden="true" />
               </div>
+              <div class="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/60 to-transparent" aria-hidden="true" />
             </div>
-            <div class="space-y-1 p-2">
-              <h2 class="line-clamp-2 text-sm font-semibold text-zinc-900 group-hover:text-primary-700">
+            <div class="min-h-[4.5rem] space-y-1 bg-panel/95 p-2.5">
+              <h2 class="line-clamp-2 text-[13px] font-semibold leading-5 text-zinc-900 transition-colors duration-300 group-hover:text-primary-700">
                 {{ favorite.title }}
               </h2>
               <p class="truncate text-xs text-zinc-500">
@@ -44,7 +45,7 @@
           </RouterLink>
           <button
             type="button"
-            class="absolute right-1.5 top-1.5 hidden h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white transition hover:bg-red-600 group-hover:flex"
+            class="absolute right-1.5 top-1.5 flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/60 text-white opacity-100 shadow-lg backdrop-blur-sm transition duration-200 hover:bg-red-600 focus-visible:pointer-events-auto focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 sm:pointer-events-none sm:opacity-0 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100 sm:group-hover:pointer-events-auto sm:group-hover:opacity-100"
             aria-label="取消收藏"
             title="取消收藏"
             @click.prevent="handleRemove(favorite)"

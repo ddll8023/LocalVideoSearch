@@ -10,10 +10,12 @@
           <font-awesome-icon :icon="['fas', 'rotate']" aria-hidden="true" />
           <span>刷新</span>
         </button>
-        <select v-model="exportFormat" class="field-input w-24" aria-label="导出格式">
-          <option value="json">JSON</option>
-          <option value="csv">CSV</option>
-        </select>
+        <AppSelect
+          v-model="exportFormat"
+          :options="exportFormatOptions"
+          class="w-24"
+          aria-label="导出格式"
+        />
         <button class="toolbar-button" type="button" :disabled="exporting" @click="handleExportLogs">
           <font-awesome-icon :icon="['fas', exporting ? 'spinner' : 'file-export']" :class="{ 'fa-spin': exporting }" aria-hidden="true" />
           <span>导出</span>
@@ -35,20 +37,18 @@
       </div>
     </div>
 
-    <div class="surface rounded-lg p-4">
+    <div class="surface relative z-30 rounded-lg p-4">
       <div class="grid gap-3 lg:grid-cols-[150px_150px_180px_180px_1fr_auto]">
-        <select v-model="filters.logType" class="field-input">
-          <option value="">全部类型</option>
-          <option value="system">系统</option>
-          <option value="request">请求</option>
-          <option value="operation">操作</option>
-        </select>
-        <select v-model="filters.level" class="field-input">
-          <option value="">全部级别</option>
-          <option value="INFO">INFO</option>
-          <option value="WARNING">WARNING</option>
-          <option value="ERROR">ERROR</option>
-        </select>
+        <AppSelect
+          v-model="filters.logType"
+          :options="logTypeOptions"
+          aria-label="日志类型"
+        />
+        <AppSelect
+          v-model="filters.level"
+          :options="levelOptions"
+          aria-label="日志级别"
+        />
         <input v-model="filters.startTime" class="field-input" type="datetime-local" />
         <input v-model="filters.endTime" class="field-input" type="datetime-local" />
         <input v-model="filters.keyword" class="field-input" type="search" placeholder="关键词" />
@@ -138,6 +138,7 @@ import AppEmptyState from '@/components/base/AppEmptyState.vue'
 import AppLoadingState from '@/components/base/AppLoadingState.vue'
 import AppModal from '@/components/base/AppModal.vue'
 import AppPagination from '@/components/base/AppPagination.vue'
+import AppSelect from '@/components/base/AppSelect.vue'
 
 const toast = useToastStore()
 
@@ -169,6 +170,25 @@ const typeLabelMap = {
   request: '请求',
   operation: '操作'
 }
+
+const exportFormatOptions = [
+  { value: 'json', label: 'JSON' },
+  { value: 'csv', label: 'CSV' }
+]
+
+const logTypeOptions = [
+  { value: '', label: '全部类型' },
+  { value: 'system', label: '系统' },
+  { value: 'request', label: '请求' },
+  { value: 'operation', label: '操作' }
+]
+
+const levelOptions = [
+  { value: '', label: '全部级别' },
+  { value: 'INFO', label: 'INFO' },
+  { value: 'WARNING', label: 'WARNING' },
+  { value: 'ERROR', label: 'ERROR' }
+]
 
 const levelClassMap = {
   INFO: 'rounded bg-primary-50 px-2 py-0.5 text-primary-700',

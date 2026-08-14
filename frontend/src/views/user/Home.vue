@@ -267,21 +267,34 @@ const failedRecordImages = reactive({})
 const activeResult = computed(() => searchStore.activeResult)
 const totalPages = computed(() => Math.max(Number(activeResult.value?.pagination?.total_pages || 1), 1))
 
-const siteTabs = computed(() =>
-  Object.keys(searchStore.statusMap).map((siteId) => {
-    const result = searchStore.resultMap[siteId]
-    const failure = searchStore.failureMap[siteId]
-    const site =
-      result?.site || failure?.site || resourceStore.sites.find((item) => item.site_id === siteId)
-    return {
-      siteId,
-      name: site?.name || siteId,
-      status: searchStore.statusMap[siteId],
-      total: result?.pagination?.total ?? 0,
-      message: failure?.message || ''
-    }
+const siteTabs = computed(() => {
+  const tabById = new Map(
+    Object.keys(searchStore.statusMap).map((siteId) => {
+      const result = searchStore.resultMap[siteId]
+      const failure = searchStore.failureMap[siteId]
+      const site =
+        result?.site || failure?.site || resourceStore.sites.find((item) => item.site_id === siteId)
+      return [
+        siteId,
+        {
+          siteId,
+          name: site?.name || siteId,
+          status: searchStore.statusMap[siteId],
+          total: result?.pagination?.total ?? 0,
+          message: failure?.message || ''
+        }
+      ]
+    })
+  )
+  // 无论新搜索还是缓存恢复，左侧列表都按资源站配置顺序展示；配置中不存在的站点追加到末尾
+  const orderedTabs = resourceStore.sites
+    .filter((site) => tabById.has(site.site_id))
+    .map((site) => tabById.get(site.site_id))
+  tabById.forEach((tab) => {
+    if (!orderedTabs.includes(tab)) orderedTabs.push(tab)
   })
-)
+  return orderedTabs
+})
 
 const showEmptyState = computed(
   () => !searchStore.loading && siteTabs.value.length === 0
@@ -295,6 +308,10 @@ onMounted(() => {
   searchStore.restoreCache()
   draftKeyword.value = searchStore.keyword
   loadPlayRecords()
+  // 加载资源站配置，保证缓存恢复后左侧站点列表按配置顺序展示
+  if (resourceStore.sites.length === 0) {
+    resourceStore.fetchSites().catch(() => {})
+  }
 })
 
 /**
