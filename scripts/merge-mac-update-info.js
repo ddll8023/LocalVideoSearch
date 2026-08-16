@@ -39,6 +39,13 @@ if (duplicateUrls.length > 0) {
   throw new Error(`Duplicate macOS update files: ${duplicateUrls.map((file) => file.url).join(', ')}`)
 }
 
+const zipFiles = files.filter((file) => file.url.toLowerCase().endsWith('.zip'))
+const hasArm64Zip = zipFiles.some((file) => /(?:^|[-_])arm64(?:[-_.]|$)/i.test(file.url))
+const hasX64Zip = zipFiles.some((file) => !/(?:^|[-_])(?:arm64|aarch64)(?:[-_.]|$)/i.test(file.url))
+if (!hasArm64Zip || !hasX64Zip) {
+  throw new Error('macOS update metadata must contain both arm64 and x64 ZIP assets')
+}
+
 const releaseDate = metadata.map((item) => item.releaseDate).find(Boolean) || ''
 const output = [
   `version: ${[...versions][0]}`,

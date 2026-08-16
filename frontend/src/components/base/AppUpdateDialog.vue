@@ -40,6 +40,37 @@
         <p class="text-right text-xs text-zinc-500">{{ progress }}%</p>
       </div>
 
+      <div v-else-if="isInstalling" class="flex items-start gap-3">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700">
+          <font-awesome-icon class="animate-pulse" :icon="['fas', 'rotate']" aria-hidden="true" />
+        </span>
+        <div class="space-y-1">
+          <p class="font-medium text-ink">正在安装更新</p>
+          <p class="text-sm text-zinc-500">应用即将退出并自动重启，请稍候。</p>
+        </div>
+      </div>
+
+      <div v-else-if="isInstalled" class="flex items-start gap-3">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+          <font-awesome-icon :icon="['fas', 'circle-check']" aria-hidden="true" />
+        </span>
+        <div class="space-y-1">
+          <p class="font-medium text-ink">更新已完成</p>
+          <p class="text-sm text-zinc-500">VideoSearch 已更新到 v{{ status.version }}。</p>
+          <p v-if="status.error" class="text-sm text-amber-700">{{ status.error }}</p>
+        </div>
+      </div>
+
+      <div v-else-if="isError" class="flex items-start gap-3">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-700">
+          <font-awesome-icon :icon="['fas', 'triangle-exclamation']" aria-hidden="true" />
+        </span>
+        <div class="space-y-1">
+          <p class="font-medium text-ink">更新失败</p>
+          <p class="text-sm text-zinc-600">{{ status.error || '自动更新未完成，请稍后重试。' }}</p>
+        </div>
+      </div>
+
       <div v-else class="flex items-start gap-3">
         <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
           <font-awesome-icon :icon="['fas', 'circle-check']" aria-hidden="true" />
@@ -53,8 +84,8 @@
 
     <template #footer>
       <div class="flex justify-end gap-2">
-        <button type="button" class="toolbar-button" @click="handleLater">
-          {{ isDownloading ? '后台下载' : '稍后' }}
+        <button type="button" class="toolbar-button" :disabled="isInstalling" @click="handleLater">
+          {{ isDownloading ? '后台下载' : isInstalling ? '请稍候' : '关闭' }}
         </button>
         <button v-if="isAvailable" type="button" class="primary-button" @click="$emit('download')">
           下载更新
@@ -87,15 +118,27 @@ const emit = defineEmits(['download', 'install', 'dismiss'])
 const dismissed = ref(false)
 
 const isAvailable = computed(() => props.status.status === 'available')
-const isDownloading = computed(() => ['downloading', 'installing'].includes(props.status.status))
+const isDownloading = computed(() => props.status.status === 'downloading')
+const isInstalling = computed(() => props.status.status === 'installing')
 const isDownloaded = computed(() => props.status.status === 'downloaded')
-const isVisible = computed(() => !dismissed.value && (isAvailable.value || isDownloading.value || isDownloaded.value))
+const isInstalled = computed(() => props.status.status === 'installed')
+const isError = computed(() => props.status.status === 'error')
+const isVisible = computed(() => {
+  return !dismissed.value && (
+    isAvailable.value ||
+    isDownloading.value ||
+    isInstalling.value ||
+    isDownloaded.value ||
+    isInstalled.value ||
+    isError.value
+  )
+})
 const progress = computed(() => Math.min(100, Math.max(0, Math.round(Number(props.status.percent) || 0))))
 
 watch(
   () => props.status.status,
   (status) => {
-    if (status === 'available' || status === 'downloaded') {
+    if (['available', 'downloaded', 'installed', 'error'].includes(status)) {
       dismissed.value = false
     }
   }

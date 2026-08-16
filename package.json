@@ -29,7 +29,8 @@
     },
     "files": [
       "package.json",
-      "electron/**/*"
+      "electron/**/*",
+      "!electron/update/update-helper.js"
     ],
     "extraResources": [
       {
@@ -53,6 +54,10 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "electron/update/update-helper.js",
+        "to": "update-helper/update-helper.js"
       }
     ],
     "mac": {

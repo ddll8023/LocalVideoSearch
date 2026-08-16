@@ -1,6 +1,6 @@
 const { app, BrowserWindow, dialog, ipcMain } = require('electron')
-const { autoUpdater } = require('electron-updater')
 const { spawn } = require('node:child_process')
+const { createMacUpdateManager } = require('./custom-updater')
 const fs = require('node:fs')
 const http = require('node:http')
 const path = require('node:path')
@@ -42,6 +42,7 @@ let updateState = {
   error: ''
 }
 let autoUpdaterInitialized = false
+let macUpdateManager = null
 
 function getBackendRoot() {
   return app.isPackaged
@@ -159,11 +160,24 @@ function getUpdateInfo(info = {}) {
   }
 }
 
+function getMacUpdateManager() {
+  if (!macUpdateManager) {
+    macUpdateManager = createMacUpdateManager({
+      app,
+      projectRoot: PROJECT_ROOT,
+      publishState: publishUpdateState,
+      getState: () => updateState
+    })
+  }
+  return macUpdateManager
+}
+
 function setupAutoUpdater() {
-  if (!app.isPackaged || autoUpdaterInitialized) {
+  if (!app.isPackaged || autoUpdaterInitialized || process.platform === 'darwin') {
     return
   }
 
+  const { autoUpdater } = require('electron-updater')
   autoUpdaterInitialized = true
   autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
@@ -221,6 +235,22 @@ async function checkForUpdates() {
     return publishUpdateState({ status: 'disabled', error: '' })
   }
 
+  if (process.platform === 'darwin') {
+    if (['checking', 'downloading'].includes(updateState.status)) {
+      return updateState
+    }
+
+    try {
+      await getMacUpdateManager().check()
+    } catch (error) {
+      publishUpdateState({
+        status: 'error',
+        error: error?.message || '自动更新检查失败'
+      })
+    }
+    return updateState
+  }
+
   setupAutoUpdater()
   if (['checking', 'downloading'].includes(updateState.status)) {
     return updateState
@@ -228,6 +258,7 @@ async function checkForUpdates() {
 
   publishUpdateState({ status: 'checking', error: '' })
   try {
+    const { autoUpdater } = require('electron-updater')
     await autoUpdater.checkForUpdates()
   } catch (error) {
     publishUpdateState({
@@ -244,8 +275,13 @@ async function downloadUpdate() {
   }
 
   try {
-    publishUpdateState({ status: 'downloading', percent: 0, error: '' })
-    await autoUpdater.downloadUpdate()
+    if (process.platform === 'darwin') {
+      await getMacUpdateManager().download()
+    } else {
+      publishUpdateState({ status: 'downloading', percent: 0, error: '' })
+      const { autoUpdater } = require('electron-updater')
+      await autoUpdater.downloadUpdate()
+    }
   } catch (error) {
     publishUpdateState({
       status: 'error',
@@ -260,8 +296,20 @@ function installUpdate() {
     return updateState
   }
 
-  publishUpdateState({ status: 'installing', error: '' })
-  setImmediate(() => autoUpdater.quitAndInstall(false, true))
+  try {
+    if (process.platform === 'darwin') {
+      return getMacUpdateManager().install()
+    }
+
+    publishUpdateState({ status: 'installing', error: '' })
+    const { autoUpdater } = require('electron-updater')
+    setImmediate(() => autoUpdater.quitAndInstall(false, true))
+  } catch (error) {
+    publishUpdateState({
+      status: 'error',
+      error: error?.message || '更新安装失败'
+    })
+  }
   return updateState
 }
 
@@ -575,6 +623,15 @@ app.whenReady().then(async () => {
     return
   }
 
+  let hasFreshInstallResult = false
+  if (app.isPackaged && process.platform === 'darwin') {
+    const installResult = getMacUpdateManager().consumeInstallResult()
+    if (installResult) {
+      hasFreshInstallResult = true
+      publishUpdateState(installResult)
+    }
+  }
+
   const backendReady = await ensureBackendOrShowError()
   if (!backendReady) {
     return
@@ -582,7 +639,7 @@ app.whenReady().then(async () => {
 
   createWindow()
   setupAutoUpdater()
-  if (app.isPackaged) {
+  if (app.isPackaged && !hasFreshInstallResult) {
     setTimeout(() => checkForUpdates(), 1500)
   }
 

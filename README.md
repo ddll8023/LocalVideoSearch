@@ -227,7 +227,7 @@ macOS 应在 macOS 主机或对应 CI runner 上执行：
 npm run dist:mac
 ```
 
-会生成 DMG 与 ZIP，产物写入 `release/`，文件名包含版本和构建机 CPU 架构。CI 配置了签名/公证环境变量入口；未提供对应 Secrets 时仍会生成未签名、未公证包，首次打开可能需要在系统安全设置中允许，自动更新也可能被系统安全策略拦截。
+会生成 DMG 与 ZIP，产物写入 `release/`，文件名包含版本和构建机 CPU 架构。CI 保留签名/公证环境变量入口；未提供对应 Secrets 时仍会生成未签名、未公证包，首次打开可能需要在系统安全设置中允许。macOS 自动更新使用内置免签名更新器，不依赖 Squirrel.Mac 的代码签名校验，但首次安装仍受 Gatekeeper 安全策略影响。
 
 ### Windows
 
@@ -265,7 +265,9 @@ CI 可选读取以下 Secrets：`MACOS_CSC_LINK`、`MACOS_CSC_KEY_PASSWORD`、`A
 
 ### 自动更新
 
-打包环境启动后会自动检查 GitHub Releases。发现新版本时弹出版本信息，用户确认后下载；下载完成后可立即重启安装，也可以稍后退出时安装。开发脚本不会检查线上更新。发布时必须同时上传安装包、ZIP、`latest.yml`/`latest-mac.yml` 和 blockmap 文件；macOS 正式更新建议使用签名和公证包。
+打包环境启动后会自动检查 GitHub Releases。Windows 使用 `electron-updater`；macOS 使用免签名自定义更新器：通过 GitHub Releases API 获取 `latest-mac.yml`，按当前 CPU 架构选择 ZIP，流式下载并校验 SHA-512，再由独立 helper 等待主进程退出、校验 ZIP 路径和 Bundle ID/版本后完成替换、回滚与重启。缺少 SHA-512 时仅降级为 HTTPS 加完整文件大小校验，并记录原因。开发脚本不会检查线上更新。
+
+发布时必须同时上传安装包、ZIP、`latest.yml`/`latest-mac.yml` 和 blockmap 文件；`latest-mac.yml` 必须同时包含 macOS x64 与 arm64 的 ZIP 资产。自动更新不能替代首次安装的代码签名和公证，未签名包首次打开仍可能需要用户在系统安全设置中允许。
 
 ## 数据与外部依赖说明
 
@@ -309,7 +311,7 @@ macOS 应确认 `backend/dist/backend` 存在，Windows 应确认 `backend/dist/
 
 ### 自动更新不弹出
 
-自动更新只在打包版本启用。确认 GitHub Release 中存在当前平台对应的安装包、`latest.yml` 或 `latest-mac.yml` 及 blockmap 文件，并确认正式包已完成代码签名；开发脚本不会弹出更新提示。
+自动更新只在打包版本启用。确认 GitHub Release 中存在当前平台对应的安装包、`latest.yml` 或 `latest-mac.yml` 及 blockmap 文件；macOS 还要确认 `latest-mac.yml` 同时包含当前架构的 ZIP，Windows 则继续要求 NSIS 更新资产。开发脚本不会弹出更新提示。
 
 ### 后端健康检查超时或端口占用
 
