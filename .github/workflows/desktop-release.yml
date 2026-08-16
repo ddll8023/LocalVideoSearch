@@ -14,13 +14,13 @@ jobs:
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.runner }}
     env:
-      CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
-      CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
-      APPLE_ID: ${{ secrets.APPLE_ID }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-      WIN_CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
-      WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+      MACOS_CSC_LINK_SECRET: ${{ secrets.MACOS_CSC_LINK }}
+      MACOS_CSC_KEY_PASSWORD_SECRET: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+      APPLE_ID_SECRET: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD_SECRET: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID_SECRET: ${{ secrets.APPLE_TEAM_ID }}
+      WINDOWS_CSC_LINK_SECRET: ${{ secrets.WINDOWS_CSC_LINK }}
+      WINDOWS_CSC_KEY_PASSWORD_SECRET: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
     strategy:
       fail-fast: false
       matrix:
@@ -61,6 +61,29 @@ jobs:
         run: |
           uv python install 3.12
           uv sync --directory backend --python 3.12 --group build --locked
+
+      - name: Configure macOS signing and notarization
+        if: matrix.target == 'mac' && env.MACOS_CSC_LINK_SECRET != ''
+        shell: bash
+        run: |
+          {
+            printf 'CSC_LINK=%s\n' "$MACOS_CSC_LINK_SECRET"
+            printf 'CSC_KEY_PASSWORD=%s\n' "$MACOS_CSC_KEY_PASSWORD_SECRET"
+            if [ -n "$APPLE_ID_SECRET" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD_SECRET" ]; then
+              printf 'APPLE_ID=%s\n' "$APPLE_ID_SECRET"
+              printf 'APPLE_APP_SPECIFIC_PASSWORD=%s\n' "$APPLE_APP_SPECIFIC_PASSWORD_SECRET"
+              printf 'APPLE_TEAM_ID=%s\n' "$APPLE_TEAM_ID_SECRET"
+            fi
+          } >> "$GITHUB_ENV"
+
+      - name: Configure Windows signing
+        if: matrix.target == 'win' && env.WINDOWS_CSC_LINK_SECRET != ''
+        shell: bash
+        run: |
+          {
+            printf 'WIN_CSC_LINK=%s\n' "$WINDOWS_CSC_LINK_SECRET"
+            printf 'WIN_CSC_KEY_PASSWORD=%s\n' "$WINDOWS_CSC_KEY_PASSWORD_SECRET"
+          } >> "$GITHUB_ENV"
 
       - name: Build desktop artifacts
         run: npm run dist:${{ matrix.target }}
