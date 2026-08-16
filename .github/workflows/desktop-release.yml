@@ -26,10 +26,10 @@ jobs:
       matrix:
         include:
           - name: macos-x64
-            runner: macos-13
+            runner: macos-15-intel
             target: mac
           - name: macos-arm64
-            runner: macos-14
+            runner: macos-15
             target: mac
           - name: windows-x64
             runner: windows-2022
