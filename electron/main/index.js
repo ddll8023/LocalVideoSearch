@@ -1,4 +1,5 @@
 const { app, BrowserWindow, dialog, ipcMain } = require('electron')
+const { autoUpdater } = require('electron-updater')
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const http = require('node:http')
@@ -6,9 +7,18 @@ const path = require('node:path')
 
 let mainWindow = null
 
+const APP_ID = 'com.videosearch.desktop'
+const APP_NAME = 'VideoSearch'
+const LEGACY_USER_DATA_NAME = 'videosearch-desktop'
 const BACKEND_HOST = '127.0.0.1'
 const BACKEND_PORT = 4740
 const PROJECT_ROOT = path.resolve(__dirname, '../..')
+const APP_DATA_ROOT = path.join(app.getPath('appData'), APP_NAME)
+const LEGACY_USER_DATA_ROOT = path.join(app.getPath('appData'), LEGACY_USER_DATA_NAME)
+
+app.setName(APP_NAME)
+app.setAppUserModelId(APP_ID)
+app.setPath('userData', APP_DATA_ROOT)
 
 let backendProcess = null
 let isWaitingBackendStop = false
@@ -23,6 +33,16 @@ let backendState = {
   error: ''
 }
 
+let updateState = {
+  status: 'idle',
+  version: '',
+  releaseName: '',
+  releaseDate: '',
+  percent: 0,
+  error: ''
+}
+let autoUpdaterInitialized = false
+
 function getBackendRoot() {
   return app.isPackaged
     ? path.join(process.resourcesPath, 'backend')
@@ -31,7 +51,8 @@ function getBackendRoot() {
 
 function getBackendExecutablePath() {
   if (app.isPackaged) {
-    return path.join(getBackendRoot(), 'backend.exe')
+    const executableName = process.platform === 'win32' ? 'backend.exe' : 'backend'
+    return path.join(getBackendRoot(), executableName)
   }
   const isWindows = process.platform === 'win32'
   const venvPython = isWindows
@@ -54,6 +75,194 @@ function getRendererFilePath() {
   return app.isPackaged
     ? path.join(process.resourcesPath, 'frontend', 'dist', 'index.html')
     : path.join(PROJECT_ROOT, 'frontend', 'dist', 'index.html')
+}
+
+function removeLegacyEntry(entryName) {
+  fs.rmSync(path.join(LEGACY_USER_DATA_ROOT, entryName), { force: true, recursive: true })
+}
+
+function moveLegacyEntry(entryName) {
+  const sourcePath = path.join(LEGACY_USER_DATA_ROOT, entryName)
+  const targetPath = path.join(APP_DATA_ROOT, entryName)
+
+  if (!fs.existsSync(sourcePath)) {
+    return
+  }
+
+  if (fs.existsSync(targetPath)) {
+    removeLegacyEntry(entryName)
+    return
+  }
+
+  fs.mkdirSync(path.dirname(targetPath), { recursive: true })
+  fs.renameSync(sourcePath, targetPath)
+}
+
+function migrateLegacyDatabase() {
+  const databaseEntries = ['video_search.db', 'video_search.db-shm', 'video_search.db-wal']
+  const sourceDatabasePath = path.join(LEGACY_USER_DATA_ROOT, 'video_search.db')
+  const targetDatabasePath = path.join(APP_DATA_ROOT, 'video_search.db')
+
+  if (!fs.existsSync(sourceDatabasePath)) {
+    for (const entryName of databaseEntries.slice(1)) {
+      removeLegacyEntry(entryName)
+    }
+    return
+  }
+
+  if (fs.existsSync(targetDatabasePath)) {
+    for (const entryName of databaseEntries) {
+      removeLegacyEntry(entryName)
+    }
+    return
+  }
+
+  for (const entryName of databaseEntries) {
+    moveLegacyEntry(entryName)
+  }
+}
+
+function migrateLegacyUserData() {
+  if (
+    path.resolve(LEGACY_USER_DATA_ROOT) === path.resolve(APP_DATA_ROOT) ||
+    !fs.existsSync(LEGACY_USER_DATA_ROOT)
+  ) {
+    return
+  }
+
+  fs.mkdirSync(APP_DATA_ROOT, { recursive: true })
+  moveLegacyEntry('resource_sites.json')
+  migrateLegacyDatabase()
+  moveLegacyEntry('logs')
+
+  fs.rmSync(LEGACY_USER_DATA_ROOT, { force: true, recursive: true })
+}
+
+function publishUpdateState(nextState) {
+  updateState = {
+    ...updateState,
+    ...nextState
+  }
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update:status', updateState)
+  }
+
+  return updateState
+}
+
+function getUpdateInfo(info = {}) {
+  return {
+    version: info.version || '',
+    releaseName: info.releaseName || '',
+    releaseDate: info.releaseDate || ''
+  }
+}
+
+function setupAutoUpdater() {
+  if (!app.isPackaged || autoUpdaterInitialized) {
+    return
+  }
+
+  autoUpdaterInitialized = true
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.allowDowngrade = false
+
+  autoUpdater.on('checking-for-update', () => {
+    publishUpdateState({ status: 'checking', error: '' })
+  })
+
+  autoUpdater.on('update-available', (info) => {
+    publishUpdateState({
+      status: 'available',
+      ...getUpdateInfo(info),
+      percent: 0,
+      error: ''
+    })
+  })
+
+  autoUpdater.on('update-not-available', (info) => {
+    publishUpdateState({
+      status: 'not-available',
+      ...getUpdateInfo(info),
+      percent: 0,
+      error: ''
+    })
+  })
+
+  autoUpdater.on('download-progress', (progress) => {
+    publishUpdateState({
+      status: 'downloading',
+      percent: Math.min(100, Math.max(0, Math.round(progress.percent || 0))),
+      error: ''
+    })
+  })
+
+  autoUpdater.on('update-downloaded', (info) => {
+    publishUpdateState({
+      status: 'downloaded',
+      ...getUpdateInfo(info),
+      percent: 100,
+      error: ''
+    })
+  })
+
+  autoUpdater.on('error', (error) => {
+    publishUpdateState({
+      status: 'error',
+      error: error?.message || '自动更新失败'
+    })
+  })
+}
+
+async function checkForUpdates() {
+  if (!app.isPackaged) {
+    return publishUpdateState({ status: 'disabled', error: '' })
+  }
+
+  setupAutoUpdater()
+  if (['checking', 'downloading'].includes(updateState.status)) {
+    return updateState
+  }
+
+  publishUpdateState({ status: 'checking', error: '' })
+  try {
+    await autoUpdater.checkForUpdates()
+  } catch (error) {
+    publishUpdateState({
+      status: 'error',
+      error: error?.message || '自动更新检查失败'
+    })
+  }
+  return updateState
+}
+
+async function downloadUpdate() {
+  if (!app.isPackaged || updateState.status !== 'available') {
+    return updateState
+  }
+
+  try {
+    publishUpdateState({ status: 'downloading', percent: 0, error: '' })
+    await autoUpdater.downloadUpdate()
+  } catch (error) {
+    publishUpdateState({
+      status: 'error',
+      error: error?.message || '更新下载失败'
+    })
+  }
+  return updateState
+}
+
+function installUpdate() {
+  if (!app.isPackaged || updateState.status !== 'downloaded') {
+    return updateState
+  }
+
+  publishUpdateState({ status: 'installing', error: '' })
+  setImmediate(() => autoUpdater.quitAndInstall(false, true))
+  return updateState
 }
 
 function requestBackendHealth(baseUrl) {
@@ -117,7 +326,7 @@ async function startBackend() {
 
   const backendRoot = getBackendRoot()
   const backendExePath = getBackendExecutablePath()
-  const appDataDir = path.join(app.getPath('appData'), 'VideoSearch')
+  const appDataDir = app.getPath('userData')
   const logsDir = path.join(appDataDir, 'logs')
   const port = BACKEND_PORT
   const baseUrl = `http://${BACKEND_HOST}:${port}`
@@ -282,7 +491,7 @@ function createWindow() {
 }
 
 ipcMain.handle('app:get-info', () => ({
-  name: 'VideoSearch',
+  name: APP_NAME,
   version: app.getVersion(),
   platform: process.platform
 }))
@@ -290,6 +499,14 @@ ipcMain.handle('app:get-info', () => ({
 ipcMain.handle('backend:get-base-url', () => backendState.baseUrl)
 
 ipcMain.handle('backend:get-status', () => backendState)
+
+ipcMain.handle('update:get-status', () => updateState)
+
+ipcMain.handle('update:check', () => checkForUpdates())
+
+ipcMain.handle('update:download', () => downloadUpdate())
+
+ipcMain.handle('update:install', () => installUpdate())
 
 ipcMain.handle('window:minimize', () => {
   if (mainWindow) mainWindow.minimize()
@@ -347,12 +564,27 @@ async function ensureBackendOrShowError() {
 }
 
 app.whenReady().then(async () => {
+  try {
+    migrateLegacyUserData()
+  } catch (error) {
+    dialog.showErrorBox(
+      APP_NAME,
+      `旧开发数据迁移失败，应用无法继续启动：${error?.message || '未知错误'}`
+    )
+    app.quit()
+    return
+  }
+
   const backendReady = await ensureBackendOrShowError()
   if (!backendReady) {
     return
   }
 
   createWindow()
+  setupAutoUpdater()
+  if (app.isPackaged) {
+    setTimeout(() => checkForUpdates(), 1500)
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

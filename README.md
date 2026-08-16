@@ -2,7 +2,7 @@
 
 VideoSearch 是一款本机运行的视频聚合搜索桌面应用。它通过 Electron 启动本地 FastAPI 服务，由 Vue 界面并发检索多个已启用资源站，统一展示视频详情和播放线路，并在本机保存搜索历史、收藏、观看进度、日志与监控数据。
 
-> 当前桌面打包目标为 **Windows**；macOS 提供开发启动脚本，尚未配置对应安装包。
+> 当前桌面打包支持 **macOS** 与 **Windows**。macOS 产物按构建机 CPU 架构生成；Windows 应在 Windows 主机或 CI runner 上构建。
 
 ## 核心能力
 
@@ -40,13 +40,13 @@ flowchart LR
 
 | 范围 | 技术 |
 |---|---|
-| 桌面端 | Electron `^43.2.0`、electron-builder `^26.15.3` |
+| 桌面端 | Electron `^43.2.0`、electron-builder `^26.15.3`、electron-updater `6.8.9` |
 | 前端 | Vue `^3.5.13`、Pinia `^3.0.1`、Vue Router `^4.5.0`、Axios `^1.7.9` |
 | 播放与图表 | Artplayer `^5.4.0`、HLS.js `^1.5.20`、ECharts `^5.5.1` |
 | 样式与构建 | Tailwind CSS `^3.4.17`、Vite `^6.0.7`、FontAwesome 6 |
 | 后端 | Python `>=3.11`、FastAPI `>=0.115.0`、Uvicorn `>=0.30.0` |
 | 数据与外部请求 | SQLAlchemy `>=2.0.51`、SQLite、HTTPX `>=0.27.0` |
-| 环境与打包 | uv、Pydantic Settings、PyInstaller、NSIS |
+| 环境与打包 | uv、Pydantic Settings、PyInstaller、electron-updater、NSIS |
 
 ## 项目结构
 
@@ -62,7 +62,7 @@ LocalVideoSearch/
 ├── resources/               # 首次运行使用的默认资源站配置
 ├── doc/                     # 项目结构导航和业务模块说明
 ├── 规范文档/                # 前后端开发规范入口
-├── package.json             # Electron 启动与 Windows 打包配置
+├── package.json             # Electron 启动与 macOS/Windows 打包配置
 └── README.md
 ```
 
@@ -88,7 +88,7 @@ LocalVideoSearch/
 ```bash
 npm install
 npm --prefix frontend install
-uv sync --directory backend
+uv sync --directory backend --group build
 ```
 
 三条命令分别安装 Electron、前端和 Python 后端依赖。
@@ -170,7 +170,7 @@ Windows 也可以运行 `start-backend.bat`。单独打开前端而不启动 Ele
 
 ## 应用数据
 
-桌面模式将运行数据写入 Electron 提供的用户应用数据目录：
+开发脚本和打包软件统一使用 Electron 的 `userData` 目录，目录名固定为 `VideoSearch`：
 
 | 系统 | 典型目录 |
 |---|---|
@@ -191,6 +191,8 @@ VideoSearch/
 
 默认站点来自项目内的 `resources/resource_sites.json`。首次需要配置时会复制到用户数据目录，之后的增删改、启停和导入操作只修改用户副本。
 
+旧开发目录 `videosearch-desktop` 首次启动时会迁移可识别的业务文件；目标目录已有同名文件时以目标目录为准，旧目录随后直接删除，不保留备份。
+
 ## 可用脚本
 
 ### 根目录
@@ -199,7 +201,8 @@ VideoSearch/
 |---|---|
 | `npm run electron` | 启动 Electron，并自动编排本地后端 |
 | `npm run build:frontend` | 构建前端生产文件 |
-| `npm run build:backend` | 使用 PyInstaller 构建 Windows 后端可执行文件 |
+| `npm run build:backend` | 使用当前平台的 PyInstaller 构建后端可执行文件 |
+| `npm run dist:mac` | 构建 macOS DMG 与 ZIP 产物 |
 | `npm run dist:dir` | 构建 Windows 免安装目录版 |
 | `npm run dist:win` | 构建 Windows NSIS 安装包 |
 
@@ -212,47 +215,57 @@ VideoSearch/
 | `npm --prefix frontend run preview` | 预览前端构建结果 |
 | `npm --prefix frontend run lint` | 检查前端 JavaScript 与 Vue 文件 |
 
-## Windows 打包
+## 桌面打包
 
-当前打包配置只声明 Windows 目录版和 NSIS 安装包。以下命令应在 Windows 环境执行，因为 PyInstaller 生成当前平台的后端程序，打包配置要求 `backend.exe`。
+`npm run build:backend` 会清理旧的 PyInstaller 输出，并按当前构建机平台生成后端可执行文件。打包阶段使用 `--publish never`，只生成本地制品，不会自动上传 Release。
 
-### 免安装目录版
+### macOS
+
+macOS 应在 macOS 主机或对应 CI runner 上执行：
 
 ```bash
+npm run dist:mac
+```
+
+会生成 DMG 与 ZIP，产物写入 `release/`，文件名包含版本和构建机 CPU 架构。CI 配置了签名/公证环境变量入口；未提供对应 Secrets 时仍会生成未签名、未公证包，首次打开可能需要在系统安全设置中允许，自动更新也可能被系统安全策略拦截。
+
+### Windows
+
+Windows 应在 Windows 主机或 Windows CI runner 上执行，因为 PyInstaller 生成当前平台的后端程序：
+
+```bash
+# 免安装目录版
 npm run dist:dir
-```
 
-构建顺序：
-
-1. Vite 生成前端生产文件。
-2. PyInstaller 生成 `backend/dist/backend.exe`。
-3. electron-builder 将桌面代码、前端产物、后端程序和默认资源组装到 `release/win-unpacked/`。
-
-启动文件：
-
-```text
-release/win-unpacked/VideoSearch.exe
-```
-
-必须分发完整的 `win-unpacked` 目录，不能只复制 `VideoSearch.exe`。
-
-### NSIS 安装包
-
-```bash
+# NSIS 安装包
 npm run dist:win
 ```
 
-产物写入 `release/`，安装时允许选择目录，并创建桌面与开始菜单快捷方式。
+目录版启动文件为 `release/win-unpacked/VideoSearch.exe`，必须分发完整的 `win-unpacked` 目录；NSIS 安装包写入 `release/`，安装时允许选择目录并创建桌面与开始菜单快捷方式。
 
-### 打包资源映射
+### 构建顺序与资源映射
 
-| 源路径 | 打包后位置 |
-|---|---|
-| `backend/dist/backend.exe` | `resources/backend/backend.exe` |
-| `frontend/dist/` | `resources/frontend/dist/` |
-| `resources/` | `resources/resources/` |
+1. Vite 生成前端生产文件。
+2. PyInstaller 生成当前平台后端：macOS 为 `backend/dist/backend`，Windows 为 `backend/dist/backend.exe`。
+3. electron-builder 将桌面代码、前端产物、后端程序和默认资源组装到 `release/`。
 
-打包后运行不依赖用户本机的 Python 虚拟环境。
+| 源路径 | macOS 打包后位置 | Windows 打包后位置 |
+|---|---|---|
+| `backend/dist/backend` / `backend/dist/backend.exe` | `resources/backend/backend` | `resources/backend/backend.exe` |
+| `frontend/dist/` | `resources/frontend/dist/` | `resources/frontend/dist/` |
+| `resources/` | `resources/resources/` | `resources/resources/` |
+
+打包后运行不依赖用户本机的 Python 虚拟环境。由于 PyInstaller 不负责跨平台编译，不能把 macOS 构建机的后端直接当作 Windows 发布包；跨平台发布应使用各自原生 runner。
+
+### CI 发布
+
+`.github/workflows/desktop-release.yml` 会在 macOS x64、macOS arm64 和 Windows x64 原生 runner 上构建制品，并在发布前合并两个 macOS 架构的更新元数据。推送与 `package.json` 版本一致的 tag（例如 `v0.1.0`）后，Workflow 会校验版本、上传制品并创建 GitHub Release；手动运行 Workflow 只生成 Actions artifacts。
+
+CI 可选读取以下 Secrets：`MACOS_CSC_LINK`、`MACOS_CSC_KEY_PASSWORD`、`APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID`、`WINDOWS_CSC_LINK`、`WINDOWS_CSC_KEY_PASSWORD`。
+
+### 自动更新
+
+打包环境启动后会自动检查 GitHub Releases。发现新版本时弹出版本信息，用户确认后下载；下载完成后可立即重启安装，也可以稍后退出时安装。开发脚本不会检查线上更新。发布时必须同时上传安装包、ZIP、`latest.yml`/`latest-mac.yml` 和 blockmap 文件；macOS 正式更新建议使用签名和公证包。
 
 ## 数据与外部依赖说明
 
@@ -282,17 +295,21 @@ backend/.venv/bin/python           # macOS / Linux
 
 ### 打包时提示 `Backend executable not found`
 
-先构建后端：
+先构建当前平台的后端：
 
 ```bash
 npm run build:backend
 ```
 
-确认 `backend/dist/backend.exe` 存在后再运行 Electron 打包命令。
+macOS 应确认 `backend/dist/backend` 存在，Windows 应确认 `backend/dist/backend.exe` 存在，然后再运行对应的 Electron 打包命令。
 
 ### Electron 打开后无法加载开发页面
 
 确认 Vite 已在 `127.0.0.1:4739` 运行，再执行 `npm run electron`。
+
+### 自动更新不弹出
+
+自动更新只在打包版本启用。确认 GitHub Release 中存在当前平台对应的安装包、`latest.yml` 或 `latest-mac.yml` 及 blockmap 文件，并确认正式包已完成代码签名；开发脚本不会弹出更新提示。
 
 ### 后端健康检查超时或端口占用
 

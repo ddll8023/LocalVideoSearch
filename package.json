@@ -6,9 +6,10 @@
   "scripts": {
     "electron": "electron .",
     "build:frontend": "npm --prefix frontend run build",
-    "build:backend": "uv run --directory backend pyinstaller --onefile --name backend --distpath backend/dist backend/entry.py",
-    "dist:dir": "npm run build:frontend && npm run build:backend && electron-builder --win dir",
-    "dist:win": "npm run build:frontend && npm run build:backend && electron-builder --win"
+    "build:backend": "node scripts/build-backend.js",
+    "dist:dir": "npm run build:frontend && npm run build:backend && electron-builder --win dir --publish never",
+    "dist:win": "npm run build:frontend && npm run build:backend && electron-builder --win --publish never",
+    "dist:mac": "npm run build:frontend && npm run build:backend && electron-builder --mac --publish never"
   },
   "devDependencies": {
     "electron": "^43.2.0",
@@ -20,14 +21,24 @@
     "directories": {
       "output": "release"
     },
+    "publish": {
+      "provider": "github",
+      "owner": "ddll8023",
+      "repo": "LocalVideoSearch",
+      "releaseType": "release"
+    },
     "files": [
       "package.json",
       "electron/**/*"
     ],
     "extraResources": [
       {
-        "from": "backend/dist/backend.exe",
-        "to": "backend/backend.exe"
+        "from": "backend/dist",
+        "to": "backend",
+        "filter": [
+          "backend",
+          "backend.exe"
+        ]
       },
       {
         "from": "frontend/dist",
@@ -44,6 +55,15 @@
         ]
       }
     ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.entertainment",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
     "win": {
       "target": [
         "dir",
@@ -57,5 +77,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "VideoSearch"
     }
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
   }
 }

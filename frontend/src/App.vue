@@ -14,7 +14,7 @@
             <span class="block text-base font-semibold tracking-wide">VideoSearch</span>
             <span class="block text-[9px] uppercase tracking-[0.28em] text-zinc-400">Local cinema index</span>
           </span>
-          <span class="hidden text-xs text-zinc-400 sm:inline">v0.1.0</span>
+          <span class="hidden text-xs text-zinc-400 sm:inline">v{{ appVersion }}</span>
         </RouterLink>
 
         <div class="flex items-center">
@@ -49,6 +49,11 @@
       </RouterView>
     </main>
 
+    <AppUpdateDialog
+      :status="updateStatus"
+      @download="handleUpdateDownload"
+      @install="handleUpdateInstall"
+    />
     <AppToast />
   </div>
 </template>
@@ -59,10 +64,11 @@
  * 功能描述：提供桌面端全局导航、窗口控制、路由出口和全局消息提示
  * 依赖组件：AppToast
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 
 import AppToast from '@/components/base/AppToast.vue'
+import AppUpdateDialog from '@/components/base/AppUpdateDialog.vue'
 
 const route = useRoute()
 
@@ -85,18 +91,48 @@ const itemClass = (to) => [
 
 const isDesktop = computed(() => !!window.desktopApi)
 const isMaximized = ref(false)
+const appVersion = ref('0.1.0')
+const updateStatus = ref({
+  status: 'idle',
+  version: '',
+  releaseName: '',
+  percent: 0,
+  error: ''
+})
+let stopUpdateStatus = null
 
 const handleMinimize = () => window.desktopApi?.windowMinimize()
 const handleMaximize = () => window.desktopApi?.windowMaximize()
 const handleClose = () => window.desktopApi?.windowClose()
+const handleUpdateDownload = () => window.desktopApi?.downloadUpdate()
+const handleUpdateInstall = () => window.desktopApi?.installUpdate()
 
-onMounted(() => {
+onMounted(async () => {
   if (window.desktopApi?.onMaximizedChanged) {
     window.desktopApi.onMaximizedChanged((val) => { isMaximized.value = val })
   }
   if (window.desktopApi?.windowIsMaximized) {
     window.desktopApi.windowIsMaximized().then((val) => { isMaximized.value = val })
   }
+  if (window.desktopApi?.getAppInfo) {
+    const appInfo = await window.desktopApi.getAppInfo()
+    if (appInfo?.version) {
+      appVersion.value = appInfo.version
+    }
+  }
+  if (window.desktopApi?.onUpdateStatus) {
+    stopUpdateStatus = window.desktopApi.onUpdateStatus((status) => {
+      updateStatus.value = status
+    })
+    const currentStatus = await window.desktopApi.getUpdateStatus?.()
+    if (currentStatus) {
+      updateStatus.value = currentStatus
+    }
+  }
+})
+
+onBeforeUnmount(() => {
+  stopUpdateStatus?.()
 })
 </script>
 

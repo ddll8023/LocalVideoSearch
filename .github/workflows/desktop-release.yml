@@ -1,0 +1,120 @@
+name: Desktop release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.runner }}
+    env:
+      CSC_LINK: ${{ secrets.MACOS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.MACOS_CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      WIN_CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+      WIN_CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macos-x64
+            runner: macos-13
+            target: mac
+          - name: macos-arm64
+            runner: macos-14
+            target: mac
+          - name: windows-x64
+            runner: windows-2022
+            target: win
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install JavaScript dependencies
+        run: |
+          npm ci
+          npm ci --prefix frontend
+
+      - name: Install Python build environment
+        run: |
+          uv python install 3.12
+          uv sync --directory backend --python 3.12 --group build --locked
+
+      - name: Build desktop artifacts
+        run: npm run dist:${{ matrix.target }}
+
+      - name: Preserve architecture-specific macOS update metadata
+        if: matrix.target == 'mac'
+        shell: bash
+        run: mv "release/latest-mac.yml" "release/latest-mac-${{ matrix.name }}.yml"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: videosearch-${{ matrix.name }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate tag version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          test "$TAG_NAME" = "v$(node -p "require('./package.json').version")"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: videosearch-*
+          path: release
+          merge-multiple: true
+
+      - name: Merge macOS update metadata
+        run: |
+          node scripts/merge-mac-update-info.js \
+            release/latest-mac.yml \
+            release/latest-mac-macos-x64.yml \
+            release/latest-mac-macos-arm64.yml
+          rm release/latest-mac-macos-x64.yml release/latest-mac-macos-arm64.yml
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG_NAME" --verify-tag --generate-notes
+          find release -maxdepth 1 -type f -print0 \
+            | xargs -0 -r gh release upload "$TAG_NAME" --clobber
