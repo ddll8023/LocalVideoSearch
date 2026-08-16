@@ -19,6 +19,9 @@ logs/
 .vscode/
 .DS_Store
 
+# DSH agent workspace
+.dsh/
+
 # Release
 release/
 
