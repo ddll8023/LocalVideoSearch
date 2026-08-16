@@ -139,5 +139,5 @@ jobs:
           TAG_NAME: ${{ github.ref_name }}
         run: |
           gh release create "$TAG_NAME" --verify-tag --generate-notes
-          find release -maxdepth 1 -type f -print0 \
+          find release -maxdepth 1 -type f ! -name 'builder-debug.yml' -print0 \
             | xargs -0 -r gh release upload "$TAG_NAME" --clobber
